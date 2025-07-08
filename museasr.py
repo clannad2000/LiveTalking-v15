@@ -17,37 +17,58 @@
 
 import time
 import numpy as np
-
-import queue
 from queue import Queue
-#import multiprocessing as mp
 from baseasr import BaseASR
 from musetalk.whisper.audio2feature import Audio2Feature
+from logger import logger
 
 class MuseASR(BaseASR):
-    def __init__(self, opt, parent,audio_processor:Audio2Feature):
-        super().__init__(opt,parent)
+    def __init__(self, opt, parent, audio_processor: Audio2Feature):
+        super().__init__(opt, parent)
         self.audio_processor = audio_processor
+        self.frames = []
+        self.feat_queue = Queue()
+        self.output_queue = Queue()
 
     def run_step(self):
-        ############################################## extract audio feature ##############################################
-        start_time = time.time()
-        for _ in range(self.batch_size*2):
-            audio_frame,type,eventpoint = self.get_audio_frame()
-            self.frames.append(audio_frame)
-            self.output_queue.put((audio_frame,type,eventpoint))
-        
-        if len(self.frames) <= self.stride_left_size + self.stride_right_size:
-            return
-        
-        inputs = np.concatenate(self.frames) # [N * chunk]
-        whisper_feature = self.audio_processor.audio2feat(inputs)
-        # for feature in whisper_feature:
-        #     self.audio_feats.append(feature)        
-        #print(f"processing audio costs {(time.time() - start_time) * 1000}ms, inputs shape:{inputs.shape} whisper_feature len:{len(whisper_feature)}")
-        whisper_chunks = self.audio_processor.feature2chunks(feature_array=whisper_feature,fps=self.fps/2,batch_size=self.batch_size,start=self.stride_left_size/2 )
-        #print(f"whisper_chunks len:{len(whisper_chunks)},self.audio_feats len:{len(self.audio_feats)},self.output_queue len:{self.output_queue.qsize()}")
-        #self.audio_feats = self.audio_feats[-(self.stride_left_size + self.stride_right_size):]
-        self.feat_queue.put(whisper_chunks)
-        # discard the old part to save memory
-        self.frames = self.frames[-(self.stride_left_size + self.stride_right_size):]
+        """执行一步音频特征提取操作"""
+        start_time = time.perf_counter()  # 使用 perf_counter 获得更高精度计时
+
+        try:
+            # 收集音频帧
+            for _ in range(self.batch_size * 2):
+                audio_frame, frame_type, eventpoint = self.get_audio_frame()
+                self.frames.append(audio_frame)
+                self.output_queue.put((audio_frame, frame_type, eventpoint))
+
+            # 检查帧长度是否足够
+            stride_total = self.stride_left_size + self.stride_right_size
+            if len(self.frames) <= stride_total:
+                return
+
+            # 拼接音频帧
+            inputs = np.concatenate(self.frames)
+
+            # 提取音频特征
+            whisper_feature = self.audio_processor.audio2feat(inputs)
+
+            # 分割特征为块
+            whisper_chunks = self.audio_processor.feature2chunks(
+                feature_array=whisper_feature,
+                fps=self.fps / 2,
+                batch_size=self.batch_size,
+                start=self.stride_left_size / 2
+            )
+
+            # 将特征块放入队列
+            self.feat_queue.put(whisper_chunks)
+
+            # 丢弃旧的音频帧以节省内存
+            self.frames = self.frames[-stride_total:]
+
+            # 记录处理耗时
+            process_time = (time.perf_counter() - start_time) * 1000
+            logger.debug(f"Processing audio costs {process_time:.2f}ms, inputs shape: {inputs.shape}, whisper_feature len: {len(whisper_feature)}")
+
+        except Exception as e:
+            logger.error(f"Error in run_step: {e}")

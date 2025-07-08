@@ -38,7 +38,7 @@ from av import AudioFrame, VideoFrame
 import av
 from fractions import Fraction
 
-from ttsreal import EdgeTTS,SovitsTTS,XTTS,CosyVoiceTTS,FishTTS,TencentTTS,DoubaoTTS
+from ttsreal import EdgeTTS,SovitsTTS,XTTS,CosyVoiceTTS,FishTTS,TencentTTS
 from logger import logger
 
 from tqdm import tqdm
@@ -86,8 +86,6 @@ class BaseReal:
             self.tts = FishTTS(opt,self)
         elif opt.tts == "tencent":
             self.tts = TencentTTS(opt,self)
-        elif opt.tts == "doubao":
-            self.tts = DoubaoTTS(opt,self)
         
         self.speaking = False
 
@@ -286,8 +284,6 @@ class BaseReal:
     
     def set_custom_state(self,audiotype, reinit=True):
         print('set_custom_state:',audiotype)
-        if self.custom_audio_index.get(audiotype) is None:
-            return
         self.curr_state = audiotype
         if reinit:
             self.custom_audio_index[audiotype] = 0
@@ -365,7 +361,6 @@ class BaseReal:
                 else:
                     combine_frame = current_frame
 
-            cv2.putText(combine_frame, "LiveTalking", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128,128,128), 1)
             if self.opt.transport=='virtualcam':
                 if vircam==None:
                     height, width,_= combine_frame.shape
@@ -373,6 +368,7 @@ class BaseReal:
                 vircam.send(combine_frame)
             else: #webrtc
                 image = combine_frame
+                image[0,:] &= 0xFE
                 new_frame = VideoFrame.from_ndarray(image, format="bgr24")
                 asyncio.run_coroutine_threadsafe(video_track._queue.put((new_frame,None)), loop)
             self.record_video_data(combine_frame)

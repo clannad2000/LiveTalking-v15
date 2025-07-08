@@ -41,4 +41,3 @@ accelerate
 
 librosa
 openai
-websockets==12.0

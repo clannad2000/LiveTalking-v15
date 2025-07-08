@@ -2,8 +2,17 @@ import time
 import os
 from basereal import BaseReal
 from logger import logger
+import llm_coze
 
-def llm_response(message,nerfreal:BaseReal):
+def llm_response(text, nerfreal:BaseReal, type):
+    if type == "opai":
+        opai_response(text, nerfreal)
+    elif type == "coze":
+        coze_response(text, nerfreal)
+    else:
+        raise ValueError(f"Unsupported LLM type: {type}")
+    
+def opai_response(message, nerfreal:BaseReal):
     start = time.perf_counter()
     from openai import OpenAI
     client = OpenAI(
@@ -45,4 +54,12 @@ def llm_response(message,nerfreal:BaseReal):
             result = result+msg[lastpos:]
     end = time.perf_counter()
     logger.info(f"llm Time to last chunk: {end-start}s")
-    nerfreal.put_msg_txt(result)    
+    nerfreal.put_msg_txt(result)  
+    
+def coze_response(text, nerfreal:BaseReal):
+    start = time.perf_counter()
+    coze = llm_coze.CozeWorkflow()
+    response = coze.chat_with_coze(text)
+    end = time.perf_counter()
+    logger.info(f"llm_coze Time to last chunk: {end-start}s")
+    nerfreal.put_msg_txt(response)

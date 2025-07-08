@@ -602,45 +602,12 @@
             let mediaRecorder;
             let audioChunks = [];
             let isRecording = false;
-            let recognition;
-            
-            // 检查浏览器是否支持语音识别
-            const isSpeechRecognitionSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-            
-            if (isSpeechRecognitionSupported) {
-                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.lang = 'zh-CN';
-                
-                recognition.onresult = function(event) {
-                    let interimTranscript = '';
-                    let finalTranscript = '';
-                    
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript;
-                        } else {
-                            interimTranscript += event.results[i][0].transcript;
-                            $('#chat-message').val(interimTranscript);
-                        }
-                    }
-                    
-                    if (finalTranscript) {
-                        $('#chat-message').val(finalTranscript);
-                    }
-                };
-                
-                recognition.onerror = function(event) {
-                    console.error('语音识别错误:', event.error);
-                };
-            }
             
             // 按住说话按钮事件
             $('#voice-record-btn').on('mousedown touchstart', function(e) {
                 e.preventDefault();
                 startRecording();
-            }).on('mouseup mouseleave touchend', function() {
+            }).on('mouseup touchend', function() {
                 if (isRecording) {
                     stopRecording();
                 }
@@ -667,14 +634,17 @@
                         $('#voice-record-btn').addClass('recording-pulse');
                         $('#voice-record-btn').css('background-color', '#dc3545');
                         
-                        if (recognition) {
-                            recognition.start();
-                        }
+                        // if (recognition) {
+                        //     recognition.start();
+                        // }else{
+                        //     console.warn('语音识别未初始化，请检查浏览器支持情况。');
+                        // }
                     })
-                    .catch(function(error) {
-                        console.error('无法访问麦克风:', error);
-                        alert('无法访问麦克风，请检查浏览器权限设置。');
-                    });
+                    .catch((err) => {
+                        console.error(`${err.name}: ${err.message}`);
+                        stopRecording();
+                        });
+                console.log('开始录音...');
             }
 
             function stopRecording() {
@@ -690,33 +660,42 @@
                 $('#voice-record-btn').removeClass('recording-pulse');
                 $('#voice-record-btn').css('background-color', '');
                 
-                // 停止语音识别
-                if (recognition) {
-                    recognition.stop();
-                }
-                
-                // 获取识别的文本并发送
-                setTimeout(function() {
-                    const recognizedText = $('#chat-message').val().trim();
-                    if (recognizedText) {
-                        // 发送识别的文本
-                        fetch('/human', {
-                            body: JSON.stringify({
-                                text: recognizedText,
-                                type: 'chat',
-                                interrupt: true,
-                                sessionid: parseInt(document.getElementById('sessionid').value),
-                            }),
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            method: 'POST'
-                        });
-                        
-                        addChatMessage(recognizedText, 'user');
-                        $('#chat-message').val('');
+                mediaRecorder.onstop = function() {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'recording.wav');
+                    formData.append('type', 'chat');
+                    formData.append('interrupt', 'true');
+                    formData.append('sessionid', parseInt(document.getElementById('sessionid').value));
+                    
+                    // Log FormData entries
+                    for (let pair of formData.entries()) {
+                        console.log(pair[0] + ': ', pair[1]);
                     }
-                }, 500); 
+                    
+                    // Send audio data
+                    fetch('/human', {
+                        method: 'POST',
+                    //     headers: {
+                    //     'Content-Type': 'multipart/form-data'
+                    //   },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('音频数据发送成功', data);
+                        // 可根据接口返回数据添加聊天消息
+                        // addChatMessage(数据中的文本, 'system'); 
+                    })
+                    .catch(error => {
+                        console.error('发送音频数据时出错:', error);
+                    });
+                };
             }
 
             // WebRTC 相关功能
@@ -769,5 +748,55 @@
             }
         });
     </script>
+
+    <script src="./dist/recorder.js"></script>
 </body>
 </html>
+
+<script>
+    let recorder;
+    let audioContext;
+
+    function startRecording() {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+           .then(function (stream) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                recorder = new Recorder(source);
+                recorder.record();
+            })
+           .catch((err) => {
+                console.error(`${err.name}: ${err.message}`);
+            });
+    }
+
+    function stopRecording() {
+        if (recorder) {
+            recorder.stop();
+            recorder.exportWAV(function (blob) {
+                const formData = new FormData();
+                formData.append('audio', blob, 'recording.wav');
+                formData.append('type', 'chat');
+                formData.append('interrupt', 'true');
+                formData.append('sessionid', parseInt(document.getElementById('sessionid').value));
+
+                fetch('/human', {
+                    method: 'POST',
+                    body: formData
+                })
+                   .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                   .then(data => {
+                        console.log('Audio data sent successfully', data);
+                    })
+                   .catch(error => {
+                        console.error('Error sending audio data:', error);
+                    });
+            });
+        }
+    }
+</script>
