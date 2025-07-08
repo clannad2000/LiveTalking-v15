@@ -360,12 +360,12 @@ if __name__ == '__main__':
     # musetalk opt
     parser.add_argument('--avatar_id', type=str, default='avator_1', help="define which avatar in data/avatars")
     parser.add_argument('--bbox_shift', type=int, default=0)
-    parser.add_argument('--batch_size', type=int, default=16, help="infer batch")
+    parser.add_argument('--batch_size', type=int, default=25, help="infer batch")
 
     parser.add_argument('--customvideo_config', type=str, default='', help="custom action json")
 
     parser.add_argument('--tts', type=str, default='edgetts', help="tts service type")  # xtts gpt-sovits cosyvoice
-    parser.add_argument('--REF_FILE', type=str, default="zh-CN-YunxiNeural")
+    parser.add_argument('--REF_FILE', type=str, default="zh-CN-XiaoyiNeural")
     parser.add_argument('--REF_TEXT', type=str, default=None)
     parser.add_argument('--TTS_SERVER', type=str, default='http://127.0.0.1:9880')  # http://localhost:9000
     # parser.add_argument('--CHARACTER', type=str, default='test')

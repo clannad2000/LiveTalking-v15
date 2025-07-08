@@ -64,7 +64,7 @@ class MuseASR(BaseASR):
             self.feat_queue.put(whisper_chunks)
 
             # 丢弃旧的音频帧以节省内存
-            self.frames = self.frames[-stride_total:]
+            self.frames = self.frames[-(self.stride_left_size + self.stride_right_size):]
 
             # 记录处理耗时
             process_time = (time.perf_counter() - start_time) * 1000
