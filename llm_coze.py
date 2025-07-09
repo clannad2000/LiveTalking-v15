@@ -1,3 +1,4 @@
+import os
 import json
 import wave
 import pyaudio  
@@ -5,12 +6,17 @@ from cozepy import COZE_CN_BASE_URL
 from cozepy import Coze, TokenAuth, Message, ChatStatus, MessageContentType  # noqa
 from vosk import Model, KaldiRecognizer, SetLogLevel
 
-# Get an access_token through personal access token or oauth.
-coze_api_token = 'pat_bYBHJfpHRKWpNPM9Pq8vPKB53AL1FW0ACkar2BS5EoNJuhWTtzUQm9gShsCsbncF'
-# The default access is api.coze.com, but if you need to access api.coze.cn,
-# please use base_url to configure the api endpoint to access
+
+# 从环境变量中获取 coze_api_token 和 workflow_id
+coze_api_token = os.getenv('COZE_API_TOKEN')
+if not coze_api_token:
+    raise ValueError("COZE_API_TOKEN 环境变量未设置")
+
+workflow_id = os.getenv('WORKFLOW_ID')
+if not workflow_id:
+    raise ValueError("WORKFLOW_ID 环境变量未设置")
+
 coze_api_base = COZE_CN_BASE_URL
-workflow_id = '7505709581818757130'
 
 # 语音识别模块
 import wave
@@ -56,8 +62,7 @@ class CozeWorkflow:
     def __init__(self):
         # Initialize the Coze client with the provided token and base URL
         self.coze = Coze(auth=TokenAuth(token=coze_api_token), base_url=coze_api_base)
-        self.model = "/workspace/voice-ai-persion/vosk-model-small-cn-0.22"  # Path to the Vosk model for Chinese speech recognition
-
+        
     def chat_with_coze(self, text):
         
         # Call the coze.workflows.runs.create method to create a workflow run. The create method

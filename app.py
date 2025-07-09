@@ -59,6 +59,8 @@ avatar = None
 
 pcs = set()
 
+vosk_model = Model("/workspace/voice-ai-persion/vosk-model-cn-0.22")
+
 def randN(N) -> int:
     """生成长度为 N 的随机数"""
     min_val = 10 ** (N - 1)
@@ -142,8 +144,6 @@ async def offer(request):
             text=json.dumps({"code": -1, "data": f"Error in offer: {str(e)}"}),
             status=500
         )
-
-vosk_model = Model("/workspace/voice-ai-persion/vosk-model-cn-0.22")
 
 async def process_audio(audiofile):
     with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as tmp_file:
