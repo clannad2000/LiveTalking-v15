@@ -1,4 +1,18 @@
  [English](./README-EN.md) | 中文版   
+
+# 修改说明
+
+ 1. 新增了musetalkv1.5模型的支持，
+ 2. 修改了原工程不能使用麦克风的bug
+ 3. 增加了本地语音识别功能（vosk）
+ 4. 语言大模型接入了coze的工作流（有了工作流，数字人就可以做更多的事情了）
+ 
+ 使用教程详见：https://zhuanlan.zhihu.com/p/1926328492125065380
+ 
+
+
+#  原工程 README
+
  实时交互流式数字人，实现音视频同步对话。基本可以达到商用效果
 [wav2lip效果](https://www.bilibili.com/video/BV1scwBeyELA/) | [ernerf效果](https://www.bilibili.com/video/BV1G1421z73r/) | [musetalk效果](https://www.bilibili.com/video/BV1gm421N7vQ/)
 
