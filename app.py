@@ -208,21 +208,22 @@ async def human(request):
         if sessionid in nerfreals and params.get('interrupt'):
             nerfreals[sessionid].flush_talk()
 
+        chatText = None
         if content_type == 'json':
             if params['type'] == 'echo':
                 nerfreals[sessionid].put_msg_txt(params['text'])
             elif params['type'] == 'chat':
-                text = params['text']
-                res = await asyncio.get_event_loop().run_in_executor(None, llm_response, text, nerfreals[sessionid], "coze")
+                chatText = params['text']
+                res = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
         elif content_type == 'form':
             audiofile = params.get('audio')
             if audiofile:
-                text = await process_audio(audiofile)
-                res = await asyncio.get_event_loop().run_in_executor(None, llm_response, text, nerfreals[sessionid], "coze")
+                chatText = await process_audio(audiofile)
+                res = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
 
         return web.Response(
             content_type="application/json",
-            text=json.dumps({"code": 0, "data": "ok"})
+            text=json.dumps({"code": 0, "data": chatText}) if chatText else json.dumps({"code": 0, "data": "ok"})
         )
     except Exception as e:
         logger.error(f"Error in human: {e}")

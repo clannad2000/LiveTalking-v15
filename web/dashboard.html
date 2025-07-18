@@ -676,9 +676,6 @@
                     // Send audio data
                     fetch('/human', {
                         method: 'POST',
-                    //     headers: {
-                    //     'Content-Type': 'multipart/form-data'
-                    //   },
                         body: formData
                     })
                     .then(response => {
@@ -689,8 +686,10 @@
                     })
                     .then(data => {
                         console.log('音频数据发送成功', data);
-                        // 可根据接口返回数据添加聊天消息
-                        // addChatMessage(数据中的文本, 'system'); 
+                        if (data.code == 0) {
+                            // 调用 addChatMessage 函数显示返回的文本
+                            addChatMessage(data.data, 'user');
+                        }
                     })
                     .catch(error => {
                         console.error('发送音频数据时出错:', error);
