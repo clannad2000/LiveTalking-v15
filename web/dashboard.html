@@ -580,6 +580,9 @@
                 if (!message.trim()) return;
                 
                 console.log('Sending chat message:', message);
+
+                addChatMessage(message, 'user');
+                $('#chat-message').val('');
                 
                 fetch('/human', {
                     body: JSON.stringify({
@@ -592,10 +595,22 @@
                         'Content-Type': 'application/json'
                     },
                     method: 'POST'
+                }).then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.code == 0) {
+                        addChatMessage(data.llm_result, 'system');
+                    }
+                })
+                .catch(error => {
+                    console.error('发送聊天数据时出错:', error);
                 });
+            
                 
-                addChatMessage(message, 'user');
-                $('#chat-message').val('');
             });
 
             // 按住说话功能
@@ -633,12 +648,6 @@
                         
                         $('#voice-record-btn').addClass('recording-pulse');
                         $('#voice-record-btn').css('background-color', '#dc3545');
-                        
-                        // if (recognition) {
-                        //     recognition.start();
-                        // }else{
-                        //     console.warn('语音识别未初始化，请检查浏览器支持情况。');
-                        // }
                     })
                     .catch((err) => {
                         console.error(`${err.name}: ${err.message}`);
@@ -689,6 +698,7 @@
                         if (data.code == 0) {
                             // 调用 addChatMessage 函数显示返回的文本
                             addChatMessage(data.data, 'user');
+                            addChatMessage(data.llm_result, 'system');
                         }
                     })
                     .catch(error => {

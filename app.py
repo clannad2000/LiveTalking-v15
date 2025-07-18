@@ -209,21 +209,22 @@ async def human(request):
             nerfreals[sessionid].flush_talk()
 
         chatText = None
+        llm_result = None
         if content_type == 'json':
             if params['type'] == 'echo':
                 nerfreals[sessionid].put_msg_txt(params['text'])
             elif params['type'] == 'chat':
                 chatText = params['text']
-                res = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
         elif content_type == 'form':
             audiofile = params.get('audio')
             if audiofile:
                 chatText = await process_audio(audiofile)
-                res = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
 
         return web.Response(
             content_type="application/json",
-            text=json.dumps({"code": 0, "data": chatText}) if chatText else json.dumps({"code": 0, "data": "ok"})
+            text=json.dumps({"code": 0, "data": chatText, "llm_result": llm_result}) if chatText else json.dumps({"code": 0, "data": "ok", "llm_response": "None"})
         )
     except Exception as e:
         logger.error(f"Error in human: {e}")

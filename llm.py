@@ -6,9 +6,9 @@ import llm_coze
 
 def llm_response(text, nerfreal:BaseReal, type):
     if type == "opai":
-        opai_response(text, nerfreal)
+        return opai_response(text, nerfreal)
     elif type == "coze":
-        coze_response(text, nerfreal)
+        return coze_response(text, nerfreal)
     else:
         raise ValueError(f"Unsupported LLM type: {type}")
     
@@ -55,6 +55,7 @@ def opai_response(message, nerfreal:BaseReal):
     end = time.perf_counter()
     logger.info(f"llm Time to last chunk: {end-start}s")
     nerfreal.put_msg_txt(result)  
+    return result
     
 def coze_response(text, nerfreal:BaseReal):
     start = time.perf_counter()
@@ -63,3 +64,5 @@ def coze_response(text, nerfreal:BaseReal):
     end = time.perf_counter()
     logger.info(f"llm_coze Time to last chunk: {end-start}s")
     nerfreal.put_msg_txt(response)
+
+    return response
