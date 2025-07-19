@@ -3,6 +3,7 @@ import os
 from basereal import BaseReal
 from logger import logger
 import llm_coze
+import re
 
 def llm_response(text, nerfreal:BaseReal, type):
     if type == "opai":
@@ -63,6 +64,12 @@ def coze_response(text, nerfreal:BaseReal):
     response = coze.chat_with_coze(text)
     end = time.perf_counter()
     logger.info(f"llm_coze Time to last chunk: {end-start}s")
-    nerfreal.put_msg_txt(response)
+
+    # 把response中的内容按句号，问号，感叹号分割
+    sentences = re.split('[。？！]', response)
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if sentence:
+            nerfreal.put_msg_txt(sentence)
 
     return response
