@@ -34,21 +34,32 @@ import aiohttp
 import aiohttp_cors
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceServer, RTCConfiguration
 from aiortc.rtcrtpsender import RTCRtpSender
-from llm_coze import SaveWave
-from webrtc import HumanPlayer
-from basereal import BaseReal
-from llm import llm_response
+from core.llm.llm_coze import SaveWave
+from core.webrtc.webrtc import HumanPlayer
+from core.models.basereal import BaseReal
+from core.llm.llm import llm_response
 from pydub import AudioSegment
-import os
 import argparse
 import random
 import shutil
 import asyncio
 import torch
 from typing import Dict
-from logger import logger
 from vosk import Model
 import tempfile
+
+from core.models.musereal.musereal import MuseReal
+from core.asr.museasr import MuseASR
+from core.tts.ttsreal import EdgeTTS
+from utils.logger import logger
+from app.config import Config
+
+import sys
+import os
+
+# Add the project root directory to sys.path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, project_root)
 
 app = Flask(__name__)
 #sockets = Sockets(app)
@@ -69,18 +80,24 @@ def randN(N) -> int:
 
 def build_nerfreal(sessionid: int) -> BaseReal:
     opt.sessionid = sessionid
-    model_map = {
-        'wav2lip': ('lipreal', 'LipReal'),
-        'musetalk': ('musereal', 'MuseReal'),
-        'musetalkv15': ('musereal', 'MuseReal'),
-        'ultralight': ('lightreal', 'LightReal')
-    }
-    module_name, class_name = model_map.get(opt.model, (None, None))
-    if module_name and class_name:
-        module = __import__(module_name, fromlist=[class_name])
-        nerfreal_class = getattr(module, class_name)
-        return nerfreal_class(opt, model, avatar)
-    raise ValueError(f"Unsupported model type: {opt.model}")
+    try:
+        if opt.model == 'wav2lip':
+            from core.models.lipreal.lipreal import LipReal
+            nerfreal = LipReal(opt,model,avatar)
+        elif opt.model == 'musetalk' or opt.model == 'musetalkv15':
+            from core.models.musereal.musereal import MuseReal
+            nerfreal = MuseReal(opt,model,avatar)
+        # elif opt.model == 'ernerf':
+        #     from nerfreal import NeRFReal
+        #     nerfreal = NeRFReal(opt,model,avatar)
+        elif opt.model == 'ultralight':
+            from core.models.lightreal.lightreal import LightReal
+            nerfreal = LightReal(opt,model,avatar)
+        return nerfreal
+    except ImportError as e:
+        logger.error(f'build nerfreal failed:{e}')
+
+
 
 async def offer(request):
     try:
@@ -395,22 +412,24 @@ if __name__ == '__main__':
     }
 
     if opt.model in model_load_info:
-        from_module = 'musereal' if 'musetalk' in opt.model else \
-                      'lipreal' if opt.model == 'wav2lip' else 'lightreal'
-        module = __import__(from_module, fromlist=['load_model', 'load_avatar', 'warm_up'])
-        load_model = module.load_model
-        load_avatar = module.load_avatar
-        warm_up = module.warm_up
+        from_module = 'core.models.musereal.musereal' if 'musetalk' in opt.model else \
+                    'core.models.lipreal.lipreal' if opt.model == 'wav2lip' else 'core.models.lightreal.lightreal'
+        try:
+            module = __import__(from_module, fromlist=['load_model', 'load_avatar', 'warm_up'])
+            load_model = module.load_model
+            load_avatar = module.load_avatar
+            warm_up = module.warm_up
 
-        load_param, warm_up_param = model_load_info[opt.model]
-        logger.info(opt)
-        model = load_model(load_param)
-        avatar = load_avatar(opt.avatar_id)
-        if warm_up_param:
-            warm_up(opt.batch_size, model if opt.model != 'ultralight' else avatar, warm_up_param)
-        else:
-            warm_up(opt.batch_size, model)
-
+            load_param, warm_up_param = model_load_info[opt.model]
+            logger.info(opt)
+            model = load_model(load_param)
+            avatar = load_avatar(opt.avatar_id)
+            if warm_up_param:
+                warm_up(opt.batch_size, model if opt.model != 'ultralight' else avatar, warm_up_param)
+            else:
+                warm_up(opt.batch_size, model)
+        except ImportError as e:
+            logger.error(f"Failed to import module {from_module}: {e}")
     if opt.transport == 'virtualcam':
         thread_quit = Event()
         nerfreals[0] = build_nerfreal(0)
@@ -425,7 +444,7 @@ if __name__ == '__main__':
     appasync.router.add_post("/set_audiotype", set_audiotype)
     appasync.router.add_post("/record", record)
     appasync.router.add_post("/is_speaking", is_speaking)
-    appasync.router.add_static('/', path='web')
+    appasync.router.add_static('/', path='web/templates')
 
     # Configure default CORS settings.
     cors = aiohttp_cors.setup(appasync, defaults={

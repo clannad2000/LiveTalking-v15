@@ -18,9 +18,9 @@
 import time
 import numpy as np
 from queue import Queue
-from baseasr import BaseASR
+from core.asr.baseasr import BaseASR
 from musetalk.whisper.audio2feature import Audio2Feature
-from logger import logger
+from utils.logger import logger
 
 class MuseASR(BaseASR):
     def __init__(self, opt, parent, audio_processor: Audio2Feature):

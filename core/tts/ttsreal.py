@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from basereal import BaseReal
 
-from logger import logger
+from utils.logger import logger
 class State(Enum):
     RUNNING=0
     PAUSE=1

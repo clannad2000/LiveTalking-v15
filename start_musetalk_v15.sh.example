@@ -11,4 +11,4 @@ MODEL_NAME='musetalkv15'
 AVATAR_ID='avator_1'
 
 
-python app.py --transport webrtc --model $MODEL_NAME --avatar_id $AVATAR_ID
+python -m app.main --transport webrtc --model $MODEL_NAME --avatar_id $AVATAR_ID

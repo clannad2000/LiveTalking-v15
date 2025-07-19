@@ -9,6 +9,55 @@
  5. 对话模式增加了对话记录功能 - 2025-7-18
  
  使用教程详见：https://zhuanlan.zhihu.com/p/1926328492125065380
+
+## 工程结构
+```
+/workspace/LiveTalking
+├── app
+│   ├── __init__.py
+│   ├── main.py               # 主程序入口
+│   └── config.py             # 配置文件
+├── core
+│   ├── models                # 模型相关代码
+│   │   ├── __init__.py
+│   │   ├── musetalk
+│   │   ├── wav2lip
+│   │   └── lightreal
+│   ├── asr                   # 语音识别相关代码
+│   │   ├── __init__.py
+│   │   ├── baseasr.py
+│   │   ├── museasr.py
+│   │   └── lipasr.py
+│   ├── tts                   # 语音合成相关代码
+│   │   ├── __init__.py
+│   │   └── ttsreal.py
+│   ├── llm                   # 大语言模型相关代码
+│   │   ├── __init__.py
+│   │   ├── llm.py
+│   │   └── llm_coze.py
+│   └── webrtc                # WebRTC 相关代码
+│       ├── __init__.py
+│       └── webrtc.py
+├── data
+│   ├── avatars               # 角色资源
+│   └── video                 # 视频资源
+├── models                    # 模型权重文件
+├── web                       # 前端相关文件
+│   ├── templates             # HTML 模板
+│   ├── static                # 静态资源（CSS、JS、图片等）
+│   └── asr                   # 语音识别前端代码
+├── utils
+│   ├── __init__.py
+│   ├── logger.py             # 日志配置
+│   └── face_parsing          # 人脸解析工具
+├── scripts                   # 脚本文件
+│   └── start_musetalk_v15.sh
+├── tests                     # 测试代码
+├── requirements.txt
+├── Dockerfile
+├── README.md
+└── LICENSE
+```
  
 
 

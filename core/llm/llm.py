@@ -1,8 +1,8 @@
 import time
 import os
-from basereal import BaseReal
-from logger import logger
-import llm_coze
+from core.tts.basereal import BaseReal
+from utils.logger import logger
+import core.llm.llm_coze as llm_coze
 import re
 
 def llm_response(text, nerfreal:BaseReal, type):
