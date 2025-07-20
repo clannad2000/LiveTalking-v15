@@ -53,7 +53,8 @@ from core.asr.museasr import MuseASR
 from core.tts.ttsreal import EdgeTTS
 from utils.logger import logger
 from app.config import Config
-
+from app.nerfreals import Nerfreals
+import time
 import sys
 import os
 
@@ -63,7 +64,7 @@ sys.path.insert(0, project_root)
 
 app = Flask(__name__)
 #sockets = Sockets(app)
-nerfreals: Dict[int, BaseReal] = {}  # sessionid:BaseReal
+nerfreals = Nerfreals()
 opt = None
 model = None
 avatar = None
@@ -78,25 +79,6 @@ def randN(N) -> int:
     max_val = 10 ** N - 1
     return random.randint(min_val, max_val)
 
-def build_nerfreal(sessionid: int) -> BaseReal:
-    opt.sessionid = sessionid
-    try:
-        if opt.model == 'wav2lip':
-            from core.models.lipreal.lipreal import LipReal
-            nerfreal = LipReal(opt,model,avatar)
-        elif opt.model == 'musetalk' or opt.model == 'musetalkv15':
-            from core.models.musereal.musereal import MuseReal
-            nerfreal = MuseReal(opt,model,avatar)
-        # elif opt.model == 'ernerf':
-        #     from nerfreal import NeRFReal
-        #     nerfreal = NeRFReal(opt,model,avatar)
-        elif opt.model == 'ultralight':
-            from core.models.lightreal.lightreal import LightReal
-            nerfreal = LightReal(opt,model,avatar)
-        return nerfreal
-    except ImportError as e:
-        logger.error(f'build nerfreal failed:{e}')
-
 
 
 async def offer(request):
@@ -104,7 +86,7 @@ async def offer(request):
         params = await request.json()
         offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
 
-        if len(nerfreals) >= opt.max_session:
+        if nerfreals.length() >= opt.max_session:
             logger.info('reach max session')
             return web.Response(
                 content_type="application/json",
@@ -112,11 +94,10 @@ async def offer(request):
                 status=400
             )
 
-        sessionid = randN(6)
-        logger.info('Creating session with sessionid=%d', sessionid)
-        nerfreal = await asyncio.get_event_loop().run_in_executor(None, build_nerfreal, sessionid)
-        nerfreals[sessionid] = nerfreal
-        logger.info('Session created with sessionid=%d', sessionid)
+        sessionid = str(randN(6))
+        logger.info('Creating session with sessionid=%s', sessionid)
+        await asyncio.get_event_loop().run_in_executor(None, nerfreals.build_normal_nerfreal, sessionid, opt, model, avatar)
+        logger.info('Session created with sessionid=%s', sessionid)
 
         ice_server1 = RTCIceServer(urls='stun:stun.miwifi.com:3478')
         pc = RTCPeerConnection(configuration=RTCConfiguration(iceServers=[ice_server1]))
@@ -130,13 +111,9 @@ async def offer(request):
                 pcs.discard(pc)
             if pc.connectionState == "closed":
                 pcs.discard(pc)
-                if sessionid in nerfreals:
-                    logger.info('Deleting session with sessionid=%d', sessionid)
-                    del nerfreals[sessionid]
-                else:
-                    logger.warning('Session with sessionid=%d not found when trying to delete', sessionid)
+                nerfreals.delete_nerfreal(sessionid)
 
-        player = HumanPlayer(nerfreals[sessionid])
+        player = HumanPlayer(nerfreals.get_nerfreal(sessionid))
         audio_sender = pc.addTrack(player.audio)
         video_sender = pc.addTrack(player.video)
         capabilities = RTCRtpSender.getCapabilities("video")
@@ -221,23 +198,23 @@ async def human(request):
                 status=400
             )
 
-        sessionid = int(params.get('sessionid', 0))
-        if sessionid in nerfreals and params.get('interrupt'):
-            nerfreals[sessionid].flush_talk()
+        sessionid = str(params.get('sessionid', '0'))
+        if nerfreals.is_nerfreal_exist(sessionid) and params.get('interrupt'):
+            nerfreals.get_nerfreal(sessionid).flush_talk()
 
         chatText = None
         llm_result = None
         if content_type == 'json':
             if params['type'] == 'echo':
-                nerfreals[sessionid].put_msg_txt(params['text'])
+                nerfreals.get_nerfreal(sessionid).put_msg_txt(params['text'])
             elif params['type'] == 'chat':
                 chatText = params['text']
-                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals.get_nerfreal(sessionid), "coze")
         elif content_type == 'form':
             audiofile = params.get('audio')
             if audiofile:
                 chatText = await process_audio(audiofile)
-                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals.get_nerfreal(sessionid), "coze")
 
         return web.Response(
             content_type="application/json",
@@ -254,10 +231,10 @@ async def human(request):
 async def humanaudio(request):
     try:
         form = await request.post()
-        sessionid = int(form.get('sessionid', 0))
+        sessionid = str(form.get('sessionid', '0'))
         fileobj = form["file"]
         filebytes = fileobj.file.read()
-        nerfreals[sessionid].put_audio_file(filebytes)
+        nerfreals.get_nerfreal(sessionid).put_audio_file(filebytes)
 
         return web.Response(
             content_type="application/json",
@@ -274,8 +251,8 @@ async def humanaudio(request):
 async def set_audiotype(request):
     try:
         params = await request.json()
-        sessionid = params.get('sessionid', 0)
-        nerfreals[sessionid].set_custom_state(params['audiotype'], params['reinit'])
+        sessionid = str(params.get('sessionid', '0'))
+        nerfreals.get_nerfreal(sessionid).set_custom_state(params['audiotype'], params['reinit'])
 
         return web.Response(
             content_type="application/json",
@@ -292,11 +269,11 @@ async def set_audiotype(request):
 async def record(request):
     try:
         params = await request.json()
-        sessionid = params.get('sessionid', 0)
+        sessionid = str(params.get('sessionid', '0'))
         if params['type'] == 'start_record':
-            nerfreals[sessionid].start_recording()
+            nerfreals.get_nerfreal(sessionid).start_recording()
         elif params['type'] == 'end_record':
-            nerfreals[sessionid].stop_recording()
+            nerfreals.get_nerfreal(sessionid).stop_recording()
         return web.Response(
             content_type="application/json",
             text=json.dumps({"code": 0, "data": "ok"})
@@ -312,10 +289,10 @@ async def record(request):
 async def is_speaking(request):
     try:
         params = await request.json()
-        sessionid = params.get('sessionid', 0)
+        sessionid = str(params.get('sessionid', '0'))
         return web.Response(
             content_type="application/json",
-            text=json.dumps({"code": 0, "data": nerfreals[sessionid].is_speaking()})
+            text=json.dumps({"code": 0, "data": nerfreals.get_nerfreal(sessionid).is_speaking()})
         )
     except Exception as e:
         logger.error(f"Error in is_speaking: {e}")
@@ -340,8 +317,7 @@ async def post(url, data):
         return None
 
 async def run(push_url, sessionid):
-    nerfreal = await asyncio.get_event_loop().run_in_executor(None, build_nerfreal, sessionid)
-    nerfreals[sessionid] = nerfreal
+    await asyncio.get_event_loop().run_in_executor(None, nerfreals.build_normal_nerfreal, sessionid, opt, model, avatar)
 
     pc = RTCPeerConnection()
     pcs.add(pc)
@@ -353,7 +329,7 @@ async def run(push_url, sessionid):
             await pc.close()
             pcs.discard(pc)
 
-    player = HumanPlayer(nerfreals[sessionid])
+    player = HumanPlayer(nerfreals.get_nerfreal(sessionid))
     audio_sender = pc.addTrack(player.audio)
     video_sender = pc.addTrack(player.video)
 
@@ -395,7 +371,7 @@ if __name__ == '__main__':
     parser.add_argument('--transport', type=str, default='rtcpush')  # webrtc rtcpush virtualcam
     parser.add_argument('--push_url', type=str, default='http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream')  # rtmp://localhost/live/livestream
 
-    parser.add_argument('--max_session', type=int, default=1)  # multi session count
+    parser.add_argument('--max_session', type=int, default=2)  # multi session count
     parser.add_argument('--listenport', type=int, default=8010, help="web listen port")
 
     opt = parser.parse_args()
@@ -432,8 +408,8 @@ if __name__ == '__main__':
             logger.error(f"Failed to import module {from_module}: {e}")
     if opt.transport == 'virtualcam':
         thread_quit = Event()
-        nerfreals[0] = build_nerfreal(0)
-        rendthrd = Thread(target=nerfreals[0].render, args=(thread_quit,))
+        nerfreals.build_normal_nerfreal('virtualcam', opt, model, avatar)
+        rendthrd = Thread(target=nerfreals.get_nerfreal('virtualcam').render, args=(thread_quit,))
         rendthrd.start()
 
     appasync = web.Application(client_max_size=1024**2*100)
@@ -457,6 +433,10 @@ if __name__ == '__main__':
     # Configure CORS on all routes.
     for route in list(appasync.router.routes()):
         cors.add(route)
+
+    # 创建一个默认nerfreal
+    nerfreals.build_default_nerfreal(opt, model, avatar)
+    logger.info('Default nerfreal created with sessionid=default')
 
     pagename = 'dashboard.html'
     if opt.transport == 'rtmp':

@@ -1,97 +1,120 @@
-var pc = null;
+document.addEventListener('DOMContentLoaded', () => {
+    var pc = null;
 
-function negotiate() {
-    pc.addTransceiver('video', { direction: 'recvonly' });
-    pc.addTransceiver('audio', { direction: 'recvonly' });
-    return pc.createOffer().then((offer) => {
-        return pc.setLocalDescription(offer);
-    }).then(() => {
-        // wait for ICE gathering to complete
-        return new Promise((resolve) => {
-            if (pc.iceGatheringState === 'complete') {
-                resolve();
-            } else {
-                const checkState = () => {
-                    if (pc.iceGatheringState === 'complete') {
-                        pc.removeEventListener('icegatheringstatechange', checkState);
-                        resolve();
-                    }
-                };
-                pc.addEventListener('icegatheringstatechange', checkState);
-            }
+    function negotiate() {
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+        return pc.createOffer().then((offer) => {
+            return pc.setLocalDescription(offer);
+        }).then(() => {
+            // wait for ICE gathering to complete
+            return new Promise((resolve) => {
+                if (pc.iceGatheringState === 'complete') {
+                    resolve();
+                } else {
+                    const checkState = () => {
+                        if (pc.iceGatheringState === 'complete') {
+                            pc.removeEventListener('icegatheringstatechange', checkState);
+                            resolve();
+                        }
+                    };
+                    pc.addEventListener('icegatheringstatechange', checkState);
+                }
+            });
+        }).then(() => {
+            var offer = pc.localDescription;
+            return fetch('/offer', {
+                body: JSON.stringify({
+                    sdp: offer.sdp,
+                    type: offer.type,
+                }),
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                method: 'POST'
+            });
+        }).then((response) => {
+            return response.json();
+        }).then((answer) => {
+            document.getElementById('sessionid').value = answer.sessionid
+            return pc.setRemoteDescription(answer);
+        }).catch((e) => {
+            alert(e);
         });
-    }).then(() => {
-        var offer = pc.localDescription;
-        return fetch('/offer', {
-            body: JSON.stringify({
-                sdp: offer.sdp,
-                type: offer.type,
-            }),
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            method: 'POST'
-        });
-    }).then((response) => {
-        return response.json();
-    }).then((answer) => {
-        document.getElementById('sessionid').value = answer.sessionid
-        return pc.setRemoteDescription(answer);
-    }).catch((e) => {
-        alert(e);
-    });
-}
-
-function start() {
-    var config = {
-        sdpSemantics: 'unified-plan'
-    };
-
-    if (document.getElementById('use-stun').checked) {
-        config.iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
     }
 
-    pc = new RTCPeerConnection(config);
+    function start() {
+        var config = {
+            sdpSemantics: 'unified-plan'
+        };
 
-    // connect audio / video
-    pc.addEventListener('track', (evt) => {
-        if (evt.track.kind == 'video') {
-            document.getElementById('video').srcObject = evt.streams[0];
-        } else {
-            document.getElementById('audio').srcObject = evt.streams[0];
+        if (document.getElementById('use-stun').checked) {
+            config.iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
         }
-    });
 
-    document.getElementById('start').style.display = 'none';
-    negotiate();
-    document.getElementById('stop').style.display = 'inline-block';
-}
+        pc = new RTCPeerConnection(config);
 
-function stop() {
-    document.getElementById('stop').style.display = 'none';
+        // connect audio / video
+        pc.addEventListener('track', (evt) => {
+            if (evt.track.kind === 'video') {
+                const videoElement = document.getElementById('video');
+                if (videoElement) {
+                    videoElement.srcObject = evt.streams[0];
+                } else {
+                    console.error('Video element not found');
+                }
+            } else {
+                const audioElement = document.getElementById('audio');
+                if (audioElement) {
+                    audioElement.srcObject = evt.streams[0];
+                } else {
+                    console.error('Audio element not found');
+                }
+            }
+        });
 
-    // close peer connection
-    setTimeout(() => {
-        pc.close();
-    }, 500);
-}
+        document.getElementById('start').style.display = 'none';
+        negotiate();
+        document.getElementById('stop').style.display = 'inline-block';
+    }
 
-window.onunload = function(event) {
-    // 在这里执行你想要的操作
-    setTimeout(() => {
-        pc.close();
-    }, 500);
-};
+    function stop() {
+        document.getElementById('stop').style.display = 'none';
 
-window.onbeforeunload = function (e) {
+        // close peer connection
         setTimeout(() => {
-                pc.close();
-            }, 500);
+            pc.close();
+        }, 500);
+    }
+
+    window.onunload = function(event) {
+        // perform your desired operations here
+        setTimeout(() => {
+            pc.close();
+        }, 500);
+    };
+
+    window.onbeforeunload = function (e) {
+        setTimeout(() => {
+            pc.close();
+        }, 500);
         e = e || window.event
-        // 兼容IE8和Firefox 4之前的版本
+        // Compatibility with IE8 and versions of Firefox before 4
         if (e) {
-          e.returnValue = '关闭提示'
+            e.returnValue = 'Close prompt'
         }
-        // Chrome, Safari, Firefox 4+, Opera 12+ , IE 9+
-        return '关闭提示'
-      }
+        // Chrome, Safari, Firefox 4+, Opera 12+, IE 9+
+        return 'Close prompt'
+    }
+
+    // Add click event listeners to buttons
+    const startButton = document.getElementById('start');
+    if (startButton) {
+        startButton.addEventListener('click', start);
+    }
+
+    const stopButton = document.getElementById('stop');
+    if (stopButton) {
+        stopButton.addEventListener('click', stop);
+    }
+});
