@@ -382,11 +382,11 @@
                                     </div>
                                 </form>
                                 
-                                <!-- 按住说话按钮 -->
+                                <!-- 持续收音按钮 -->
                                 <div class="voice-record-btn" id="voice-record-btn">
                                     <i class="bi bi-mic-fill"></i>
                                 </div>
-                                <div class="voice-record-label">按住说话，松开发送</div>
+                                <div class="voice-record-label" id="voice-record-label">点击启用麦克风</div>
                             </div>
                             
                             <!-- 朗读模式 -->
@@ -613,98 +613,285 @@
                 
             });
 
-            // 按住说话功能
+            // 持续收音功能 - 声音检测版
             let mediaRecorder;
             let audioChunks = [];
             let isRecording = false;
+            let isMicEnabled = false; // 跟踪麦克风是否启用
+            let audioStream = null; // 存储音频流引用
+            let audioContext = null; // Web Audio API上下文
+            let analyser = null; // 音频分析器
+            let dataArray = null; // 音频数据数组
+            let soundDetectionInterval = null; // 声音检测定时器
+            let silenceTimeout = null; // 静默超时定时器
             
-            // 按住说话按钮事件
-            $('#voice-record-btn').on('mousedown touchstart', function(e) {
+            // 配置参数
+            const SOUND_THRESHOLD = 0.05; // 声音检测阈值 (0-1)
+            const CHECK_INTERVAL_MS = 100; // 声音检测间隔(毫秒)
+            const SILENCE_TIMEOUT_MS = 1500; // 静默超时时间(毫秒)
+            
+            // 点击按钮切换麦克风状态
+            $('#voice-record-btn').on('click', function(e) {
                 e.preventDefault();
-                startRecording();
-            }).on('mouseup touchend', function() {
-                if (isRecording) {
-                    stopRecording();
+                if (isMicEnabled) {
+                    disableMicrophone();
+                } else {
+                    enableMicrophone();
                 }
             });
             
-            // 开始录音
-            function startRecording() {
-                if (isRecording) return;
-                
+            // 自动请求麦克风权限
+            $(document).ready(function() {
+                // 请求麦克风权限
                 navigator.mediaDevices.getUserMedia({ audio: true })
                     .then(function(stream) {
-                        audioChunks = [];
-                        mediaRecorder = new MediaRecorder(stream);
-                        
-                        mediaRecorder.ondataavailable = function(e) {
-                            if (e.data.size > 0) {
-                                audioChunks.push(e.data);
-                            }
-                        };
-                        
-                        mediaRecorder.start();
-                        isRecording = true;
-                        
-                        $('#voice-record-btn').addClass('recording-pulse');
-                        $('#voice-record-btn').css('background-color', '#dc3545');
+                        console.log('麦克风权限已获取，准备开始声音检测');
+                        // 保存流，但暂时不开始录制
+                        audioStream = stream;
+                        // 初始状态为禁用
+                        $('#voice-record-label').text('点击启用麦克风');
                     })
                     .catch((err) => {
-                        console.error(`${err.name}: ${err.message}`);
-                        stopRecording();
+                        console.error(`获取麦克风权限失败: ${err.name}: ${err.message}`);
+                        $('#voice-record-label').text('麦克风权限被拒绝');
+                        $('#voice-record-btn').css('background-color', '#6c757d');
+                    });
+            });
+            
+            // 启用麦克风并开始声音检测
+            function enableMicrophone() {
+                if (isMicEnabled) return;
+                
+                if (!audioStream) {
+                    // 如果之前没有获取到音频流，重新获取
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                        .then(function(stream) {
+                            audioStream = stream;
+                            setupAudioAnalysis();
+                            startSoundDetection();
+                        })
+                        .catch((err) => {
+                            console.error(`获取麦克风权限失败: ${err.name}: ${err.message}`);
                         });
-                console.log('开始录音...');
+                } else {
+                    setupAudioAnalysis();
+                    startSoundDetection();
+                }
             }
-
+            
+            // 禁用麦克风并停止所有处理
+            function disableMicrophone() {
+                if (!isMicEnabled) return;
+                
+                // 停止录音
+                if (isRecording) {
+                    stopRecording();
+                }
+                
+                // 清除定时器
+                if (soundDetectionInterval) {
+                    clearInterval(soundDetectionInterval);
+                    soundDetectionInterval = null;
+                }
+                
+                if (silenceTimeout) {
+                    clearTimeout(silenceTimeout);
+                    silenceTimeout = null;
+                }
+                
+                // 关闭音频上下文
+                if (audioContext) {
+                    audioContext.close();
+                    audioContext = null;
+                    analyser = null;
+                    dataArray = null;
+                }
+                
+                isMicEnabled = false;
+                
+                // 更新按钮状态
+                $('#voice-record-btn').removeClass('recording-pulse');
+                $('#voice-record-btn').css('background-color', '');
+                $('#voice-record-label').text('点击启用麦克风');
+                
+                console.log('麦克风已禁用');
+            }
+            
+            // 设置音频分析器
+            function setupAudioAnalysis() {
+                if (!audioStream || audioContext) return;
+                
+                // 创建音频上下文
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // 创建音频源
+                const source = audioContext.createMediaStreamSource(audioStream);
+                
+                // 创建分析器
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                
+                // 创建数据数组
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                // 连接音频节点
+                source.connect(analyser);
+            }
+            
+            // 开始声音检测
+            function startSoundDetection() {
+                isMicEnabled = true;
+                
+                // 更新按钮状态
+                $('#voice-record-label').text('麦克风就绪，等待声音...');
+                
+                console.log('开始声音检测...');
+                
+                // 设置声音检测定时器
+                if (!soundDetectionInterval) {
+                    soundDetectionInterval = setInterval(checkSoundLevel, CHECK_INTERVAL_MS);
+                }
+            }
+            
+            // 检查声音级别
+            function checkSoundLevel() {
+                if (!analyser || !dataArray) return;
+                
+                // 获取音频数据
+                analyser.getByteFrequencyData(dataArray);
+                
+                // 计算平均音量
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / dataArray.length;
+                const normalizedLevel = average / 255; // 归一化到0-1范围
+                
+                // 检查是否检测到声音
+                if (normalizedLevel > SOUND_THRESHOLD) {
+                    console.log('检测到声音，音量级别:', normalizedLevel);
+                    
+                    // 如果正在录音，重置静默超时
+                    if (isRecording) {
+                        if (silenceTimeout) {
+                            clearTimeout(silenceTimeout);
+                            silenceTimeout = null;
+                        }
+                        
+                        // 设置新的静默超时
+                        silenceTimeout = setTimeout(function() {
+                            console.log('静默超时，结束录音');
+                            stopRecording();
+                        }, SILENCE_TIMEOUT_MS);
+                    } else {
+                        // 如果没有在录音，开始录音
+                        startRecording();
+                    }
+                }
+            }
+            
+            // 开始录音
+            function startRecording() {
+                if (isRecording || !audioStream) return;
+                
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(audioStream);
+                
+                mediaRecorder.ondataavailable = function(e) {
+                    if (e.data.size > 0) {
+                        audioChunks.push(e.data);
+                    }
+                };
+                
+                // 设置录音停止事件
+                mediaRecorder.onstop = function() {
+                    if (audioChunks.length > 0) {
+                        sendAudioData();
+                    }
+                    
+                    // 更新状态
+                    $('#voice-record-label').text('麦克风就绪，等待声音...');
+                    
+                    console.log('录音已停止');
+                };
+                
+                // 开始录音
+                mediaRecorder.start(100); // 每100ms生成一个数据块，提高灵敏度
+                isRecording = true;
+                
+                // 更新按钮状态
+                $('#voice-record-btn').addClass('recording-pulse');
+                $('#voice-record-btn').css('background-color', '#dc3545');
+                $('#voice-record-label').text('正在录音...');
+                
+                console.log('开始录音...');
+                
+                // 设置静默超时
+                if (silenceTimeout) {
+                    clearTimeout(silenceTimeout);
+                }
+                
+                silenceTimeout = setTimeout(function() {
+                    console.log('静默超时，结束录音');
+                    stopRecording();
+                }, SILENCE_TIMEOUT_MS);
+            }
+            
+            // 停止录音
             function stopRecording() {
                 if (!isRecording) return;
+                
+                // 清除静默超时
+                if (silenceTimeout) {
+                    clearTimeout(silenceTimeout);
+                    silenceTimeout = null;
+                }
                 
                 mediaRecorder.stop();
                 isRecording = false;
                 
-                // 停止所有音轨
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                console.log('停止录音...');
+            }
+            
+            // 发送音频数据到服务器
+            function sendAudioData() {
+                if (audioChunks.length === 0) return;
                 
-                // 视觉反馈恢复
-                $('#voice-record-btn').removeClass('recording-pulse');
-                $('#voice-record-btn').css('background-color', '');
+                // 创建音频Blob
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.wav');
+                formData.append('type', 'chat');
+                formData.append('interrupt', 'true');
+                formData.append('sessionid', parseInt(document.getElementById('sessionid').value));
                 
-                mediaRecorder.onstop = function() {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob, 'recording.wav');
-                    formData.append('type', 'chat');
-                    formData.append('interrupt', 'true');
-                    formData.append('sessionid', parseInt(document.getElementById('sessionid').value));
-                    
-                    // Log FormData entries
-                    for (let pair of formData.entries()) {
-                        console.log(pair[0] + ': ', pair[1]);
+                // 清空当前的音频块
+                audioChunks = [];
+                
+                // 发送音频数据
+                fetch('/human', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
                     }
-                    
-                    // Send audio data
-                    fetch('/human', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('音频数据发送成功', data);
-                        if (data.code == 0) {
-                            // 调用 addChatMessage 函数显示返回的文本
-                            addChatMessage(data.data, 'user');
-                            addChatMessage(data.llm_result, 'system');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('发送音频数据时出错:', error);
-                    });
-                };
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('音频数据发送成功', data);
+                    if (data.code == 0) {
+                        // 调用 addChatMessage 函数显示返回的文本
+                        addChatMessage(data.data, 'user');
+                        addChatMessage(data.llm_result, 'system');
+                    }
+                })
+                .catch(error => {
+                    console.error('发送音频数据时出错:', error);
+                });
             }
 
             // WebRTC 相关功能

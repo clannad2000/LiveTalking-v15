@@ -221,6 +221,12 @@ async def human(request):
             audiofile = params.get('audio')
             if audiofile:
                 chatText = await process_audio(audiofile)
+                if len(chatText) < 3:
+                    return web.Response(
+                        content_type="application/json",
+                        text=json.dumps({"code": -1, "data": "Recognized text is too short"}),
+                        status=400
+                    )
                 llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
 
         return web.Response(
