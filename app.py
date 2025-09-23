@@ -49,6 +49,7 @@ from typing import Dict
 from logger import logger
 from vosk import Model
 import tempfile
+import ssl
 
 app = Flask(__name__)
 #sockets = Sockets(app)
@@ -380,6 +381,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--max_session', type=int, default=1)  # multi session count
     parser.add_argument('--listenport', type=int, default=8010, help="web listen port")
+    parser.add_argument('--ssl_cert', type=str, default='', help="Path to SSL certificate file")
+    parser.add_argument('--ssl_key', type=str, default='', help="Path to SSL private key file")
 
     opt = parser.parse_args()
     opt.customopt = []
@@ -427,16 +430,24 @@ if __name__ == '__main__':
     appasync.router.add_post("/is_speaking", is_speaking)
     appasync.router.add_static('/', path='web')
 
-    # Configure default CORS settings.
+    # 为根路径添加处理程序，重定向到dashboard.html
+    async def handle_root(request):
+        logger.info(f"Root request from IP: {request.remote}")
+        return web.HTTPFound('/dashboard.html')
+    appasync.router.add_get('/', handle_root)
+
+    # Configure default CORS settings with more explicit method allowances
     cors = aiohttp_cors.setup(appasync, defaults={
         "*": aiohttp_cors.ResourceOptions(
             allow_credentials=True,
             expose_headers="*",
             allow_headers="*",
+            allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"]
         )
     })
     # Configure CORS on all routes.
     for route in list(appasync.router.routes()):
+        logger.info(f"Adding CORS to route: {route}")
         cors.add(route)
 
     pagename = 'dashboard.html'
@@ -444,14 +455,58 @@ if __name__ == '__main__':
         pagename = 'echoapi.html'
     elif opt.transport == 'rtcpush':
         pagename = 'rtcpushapi.html'
-    logger.info('start http server; http://<serverip>:'+str(opt.listenport)+'/'+pagename)
-    logger.info('如果使用webrtc，推荐访问webrtc集成前端: http://<serverip>:'+str(opt.listenport)+'/dashboard.html')
+    
+    # 根据是否提供SSL证书决定使用HTTP还是HTTPS
+    if opt.ssl_cert and opt.ssl_key:
+        logger.info('start https server; https://<serverip>:'+str(opt.listenport)+'/'+pagename)
+        logger.info('如果使用webrtc，推荐访问webrtc集成前端: https://<serverip>:'+str(opt.listenport)+'/dashboard.html')
+    else:
+        logger.info('start http server; http://<serverip>:'+str(opt.listenport)+'/'+pagename)
+        logger.info('如果使用webrtc，推荐访问webrtc集成前端: http://<serverip>:'+str(opt.listenport)+'/dashboard.html')
 
     def run_server(runner):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(runner.setup())
-        site = web.TCPSite(runner, '0.0.0.0', opt.listenport)
+        
+        # 配置SSL上下文（如果提供了证书和密钥）
+        if opt.ssl_cert and opt.ssl_key:
+            try:
+                # 确保证书和密钥文件存在
+                if not os.path.exists(opt.ssl_cert):
+                    logger.error(f"SSL certificate file not found: {opt.ssl_cert}")
+                    return
+                if not os.path.exists(opt.ssl_key):
+                    logger.error(f"SSL private key file not found: {opt.ssl_key}")
+                    return
+                
+                # 检查文件权限
+                cert_stat = os.stat(opt.ssl_cert)
+                key_stat = os.stat(opt.ssl_key)
+                logger.info(f"Certificate file permissions: {oct(cert_stat.st_mode)[-3:]}")
+                logger.info(f"Private key file permissions: {oct(key_stat.st_mode)[-3:]}")
+                
+                # 创建SSL上下文
+                ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+                ssl_context.load_cert_chain(certfile=opt.ssl_cert, keyfile=opt.ssl_key)
+                logger.info(f"Successfully loaded SSL certificate from {opt.ssl_cert}")
+                
+                # 设置SSL上下文选项
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                
+                # Use TCPSite with ssl_context parameter
+                site = web.TCPSite(runner, '0.0.0.0', opt.listenport, ssl_context=ssl_context)
+                logger.info(f"Starting HTTPS server on port {opt.listenport}")
+            except Exception as e:
+                logger.error(f"Failed to set up SSL context: {str(e)}")
+                # 回退到HTTP
+                site = web.TCPSite(runner, '0.0.0.0', opt.listenport)
+                logger.info(f"Falling back to HTTP server on port {opt.listenport}")
+        else:
+            site = web.TCPSite(runner, '0.0.0.0', opt.listenport)
+            logger.info(f"Starting HTTP server on port {opt.listenport}")
+            
         loop.run_until_complete(site.start())
         if opt.transport == 'rtcpush':
             for k in range(opt.max_session):
@@ -469,4 +524,3 @@ if __name__ == '__main__':
     # print('start websocket server')
     # server = pywsgi.WSGIServer(('0.0.0.0', 8000), app, handler_class=WebSocketHandler)
     # server.serve_forever()
-    

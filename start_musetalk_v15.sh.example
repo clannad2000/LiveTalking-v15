@@ -11,4 +11,4 @@ MODEL_NAME='musetalkv15'
 AVATAR_ID='avator_1'
 
 
-python app.py --transport webrtc --model $MODEL_NAME --avatar_id $AVATAR_ID
+python app.py --transport webrtc --model $MODEL_NAME --avatar_id $AVATAR_ID --ssl_cert=./ssl/certificate.crt --ssl_key=./ssl/private.key
