@@ -261,8 +261,12 @@ class BaseReal:
         self._record_video_pipe.wait()
         self._record_audio_pipe.stdin.close()
         self._record_audio_pipe.wait()
-        cmd_combine_audio = f"ffmpeg -y -i temp{self.opt.sessionid}.aac -i temp{self.opt.sessionid}.mp4 -c:v copy -c:a copy data/record.mp4"
+        # 使用sessionid命名录制文件
+        output_filename = f"{self.opt.sessionid}_record.mp4"
+        output_path = os.path.join("data", output_filename)
+        cmd_combine_audio = f"ffmpeg -y -i temp{self.opt.sessionid}.aac -i temp{self.opt.sessionid}.mp4 -c:v copy -c:a copy {output_path}"
         os.system(cmd_combine_audio) 
+        logger.info(f"视频已保存至: {output_path}")
         #os.remove(output_path)
 
     def mirror_index(self,size, index):

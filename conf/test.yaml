@@ -1,0 +1,184 @@
+swagger: "2.0"
+info:
+  title: LiveTalking-v15 API
+  description: API documentation for the LiveTalking digital human interaction platform
+  version: "1.0.0"
+  contact:
+    name: LiveTalking-v15
+    email: zhaocl1994@qq.com
+    url: https://gitee.com/brucezhao/LiveTalking-v15
+host: "localhost:8010"
+basePath: /
+schemes:
+  - http
+  - https
+consumes:
+  - application/json
+  - multipart/form-data
+produces:
+  - application/json
+  - video/mp4
+paths:
+  /offer:
+    post:
+      tags:
+        - WebRTC
+      summary: Establish WebRTC connection
+      description: Client sends WebRTC offer to establish connection, server creates new session and returns answer
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              sdp: {type: string, description: WebRTC offer SDP}
+              type: {type: string, description: WebRTC offer type}
+      responses:
+        200:
+          description: Connection established successfully
+          schema:
+            type: object
+            properties:
+              sdp: {type: string, description: WebRTC answer SDP}
+              type: {type: string, description: WebRTC answer type}
+              sessionid: {type: integer, description: Session ID}
+        400:
+          description: Maximum number of sessions reached
+        500:
+          description: Internal server error
+  
+  /human:
+    post:
+      tags:
+        - Interaction
+      summary: Process human interaction
+      description: Receive human text messages or audio files, process them and return results
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: Session ID}
+              type: {type: string, description: Interaction type, can be 'echo' or 'chat'}
+              text: {type: string, description: Text content}
+              interrupt: {type: boolean, description: Whether to interrupt current conversation}
+      responses:
+        200:
+          description: Processing successful
+        400:
+          description: Request error
+  
+  /humanaudio:
+    post:
+      tags:
+        - Audio
+      summary: Process human audio
+      description: Receive audio file and directly pass it to the digital human system without speech recognition
+      consumes:
+        - multipart/form-data
+      parameters:
+        - in: formData
+          name: sessionid
+          type: integer
+          required: true
+          description: Session ID
+        - in: formData
+          name: file
+          type: file
+          required: true
+          description: Audio file
+      responses:
+        200:
+          description: Processing successful
+        400:
+          description: Request error
+  
+  /set_audiotype:
+    post:
+      tags:
+        - Configuration
+      summary: Set audio type
+      description: Set the digital human's audio type and custom status
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: Session ID}
+              audiotype: {type: string, description: Audio type}
+              reinit: {type: boolean, description: Whether to reinitialize}
+      responses:
+        200:
+          description: Setting successful
+        400:
+          description: Request error
+  
+  /record:
+    post:
+      tags:
+        - Recording
+      summary: Recording control
+      description: Start or stop recording of digital human session
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: Session ID}
+              type: {type: string, description: Recording type, can be 'start_record' or 'end_record'}
+      responses:
+        200:
+          description: Operation successful
+        400:
+          description: Request error
+  
+  /is_speaking:
+    post:
+      tags:
+        - Status
+      summary: Check speaking status
+      description: Get whether the digital human is currently speaking
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: Session ID}
+      responses:
+        200:
+          description: Query successful
+        400:
+          description: Request error
+  
+  /download_recording:
+    get:
+      tags:
+        - Recording
+      summary: Download recording video
+      description: Download the recorded video file corresponding to the session ID
+      parameters:
+        - in: query
+          name: sessionid
+          type: integer
+          required: true
+          description: Session ID
+      produces:
+        - video/mp4
+      responses:
+        200:
+          description: Video file successfully returned
+          schema:
+            type: file
+        400:
+          description: Request error
+        404:
+          description: Video file not found

@@ -20,3 +20,13 @@ models/
 *.log
 dist
 start_musetalk_v15.sh
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Build files
+*.local
+*.build
+*.cache
+*.temp

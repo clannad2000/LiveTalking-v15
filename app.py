@@ -34,6 +34,7 @@ import aiohttp
 import aiohttp_cors
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceServer, RTCConfiguration
 from aiortc.rtcrtpsender import RTCRtpSender
+from swagger_ui import aiohttp_api_doc
 from llm_coze import SaveWave
 from webrtc import HumanPlayer
 from basereal import BaseReal
@@ -84,6 +85,51 @@ def build_nerfreal(sessionid: int) -> BaseReal:
     raise ValueError(f"Unsupported model type: {opt.model}")
 
 async def offer(request):
+    """建立WebRTC连接
+    ---
+    tags:
+    - WebRTC
+    summary: 建立WebRTC连接并创建会话
+    description: 客户端发送WebRTC offer以建立连接，服务器创建新会话并返回answer
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              sdp: {type: string, description: WebRTC offer SDP}
+              type: {type: string, description: WebRTC offer类型}
+    responses:
+      200:
+        description: 成功建立连接
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sdp: {type: string, description: WebRTC answer SDP}
+                type: {type: string, description: WebRTC answer类型}
+                sessionid: {type: integer, description: 会话ID}
+      400:
+        description: 已达到最大会话数
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+      500:
+        description: 服务器内部错误
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+    """
     try:
         params = await request.json()
         offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
@@ -183,6 +229,51 @@ async def process_audio(audiofile):
             pass
 
 async def human(request):
+    """处理人类交互
+    ---
+    tags:
+    - 交互
+    summary: 处理人类文本或音频输入
+    description: 接收人类文本消息或音频文件，进行处理并返回结果
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: 会话ID}
+              type: {type: string, description: 交互类型，可选值为'echo'或'chat'}
+              text: {type: string, description: 文本内容}
+              interrupt: {type: boolean, description: 是否中断当前对话}
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: 会话ID}
+              audio: {type: string, format: binary, description: 音频文件}
+              interrupt: {type: boolean, description: 是否中断当前对话}
+    responses:
+      200:
+        description: 处理成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 返回码，0表示成功}
+                data: {type: string, description: 识别的文本内容或状态信息}
+                llm_result: {type: string, description: LLM模型返回的结果}
+      400:
+        description: 请求错误
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+    """
     try:
         content_type = request.headers.get('Content-Type', '')
         logger.info(f"Received request with Content-Type: {content_type}")
@@ -242,6 +333,42 @@ async def human(request):
         )
 
 async def humanaudio(request):
+    """处理人类音频
+    ---
+    tags:
+    - 音频
+    summary: 直接处理人类音频文件
+    description: 接收音频文件并直接传递给数字人系统，不进行语音识别
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: 会话ID}
+              file: {type: string, format: binary, description: 音频文件}
+    responses:
+      200:
+        description: 处理成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 返回码，0表示成功}
+                msg: {type: string, description: 状态消息}
+      400:
+        description: 请求错误
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                msg: {type: string, description: 错误消息}
+                data: {type: string, description: 错误详情}
+    """
     try:
         form = await request.post()
         sessionid = int(form.get('sessionid', 0))
@@ -262,6 +389,42 @@ async def humanaudio(request):
         )
 
 async def set_audiotype(request):
+    """设置音频类型
+    ---
+    tags:
+    - 配置
+    summary: 设置数字人的音频类型和自定义状态
+    description: 设置数字人的音频类型和是否重新初始化
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: 会话ID}
+              audiotype: {type: string, description: 音频类型}
+              reinit: {type: boolean, description: 是否重新初始化}
+    responses:
+      200:
+        description: 设置成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 返回码，0表示成功}
+                data: {type: string, description: 状态消息}
+      400:
+        description: 请求错误
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+    """
     try:
         params = await request.json()
         sessionid = params.get('sessionid', 0)
@@ -280,6 +443,41 @@ async def set_audiotype(request):
         )
 
 async def record(request):
+    """录制控制
+    ---
+    tags:
+    - 录制
+    summary: 控制数字人会话的录制功能
+    description: 开始或停止数字人会话的录制
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: 会话ID}
+              type: {type: string, description: 录制类型，可选值为'start_record'或'end_record'}
+    responses:
+      200:
+        description: 操作成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 返回码，0表示成功}
+                data: {type: string, description: 状态消息}
+      400:
+        description: 请求错误
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+    """
     try:
         params = await request.json()
         sessionid = params.get('sessionid', 0)
@@ -300,12 +498,47 @@ async def record(request):
         )
 
 async def is_speaking(request):
+    """检测说话状态
+    ---
+    tags:
+    - 状态
+    summary: 检查数字人是否正在说话
+    description: 获取数字人当前是否处于说话状态
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              sessionid: {type: integer, description: 会话ID}
+    responses:
+      200:
+        description: 查询成功
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 返回码，0表示成功}
+                data: {type: boolean, description: 数字人是否正在说话}
+      400:
+        description: 请求错误
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+    """
     try:
         params = await request.json()
         sessionid = params.get('sessionid', 0)
+        speaking = nerfreals[sessionid].is_speaking()
         return web.Response(
             content_type="application/json",
-            text=json.dumps({"code": 0, "data": nerfreals[sessionid].is_speaking()})
+            text=json.dumps({"code": 0, "data": speaking})
         )
     except Exception as e:
         logger.error(f"Error in is_speaking: {e}")
@@ -313,6 +546,84 @@ async def is_speaking(request):
             content_type="application/json",
             text=json.dumps({"code": -1, "data": f"Error in is_speaking: {str(e)}"}),
             status=400
+        )
+
+async def download_recording(request):
+    """下载录制视频
+    ---
+    tags:
+    - 录制
+    summary: 下载数字人会话的录制视频
+    description: 根据会话ID下载对应的录制视频文件
+    parameters:
+      - name: sessionid
+        in: query
+        required: true
+        description: 会话ID
+        schema:
+          type: integer
+    responses:
+      200:
+        description: 成功返回视频文件
+        content:
+          video/mp4:
+            schema:
+              type: string
+              format: binary
+      400:
+        description: 请求错误
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+      404:
+        description: 视频文件不存在
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: {type: integer, description: 错误代码}
+                data: {type: string, description: 错误信息}
+    """
+    try:
+        # 获取查询参数中的sessionid
+        sessionid = request.query.get('sessionid')
+        if not sessionid:
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps({"code": -1, "data": "Missing sessionid parameter"}),
+                status=400
+            )
+        
+        # 构建文件路径
+        filename = f"{sessionid}_record.mp4"
+        filepath = os.path.join("data", filename)
+        
+        # 检查文件是否存在
+        if not os.path.exists(filepath):
+            logger.error(f"Video file not found: {filepath}")
+            return web.Response(
+                content_type="application/json",
+                text=json.dumps({"code": -1, "data": "Video file not found"}),
+                status=404
+            )
+        
+        # 设置响应头并发送文件
+        response = web.FileResponse(filepath)
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.headers['Content-Type'] = 'video/mp4'
+        logger.info(f"Downloading video: {filepath}")
+        return response
+    except Exception as e:
+        logger.error(f"Error in download_recording: {e}")
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps({"code": -1, "data": f"Error downloading video: {str(e)}"}),
+            status=500
         )
 
 async def on_shutdown(app):
@@ -428,12 +739,21 @@ if __name__ == '__main__':
 
     appasync = web.Application(client_max_size=1024**2*100)
     appasync.on_shutdown.append(on_shutdown)
+    
+    # 配置Swagger文档
+    aiohttp_api_doc(
+        appasync,
+         config_path='./conf/test.yaml', url_prefix='/api/doc', title='API doc'
+    )
+    
+    # API路由
     appasync.router.add_post("/offer", offer)
     appasync.router.add_post("/human", human)
     appasync.router.add_post("/humanaudio", humanaudio)
     appasync.router.add_post("/set_audiotype", set_audiotype)
     appasync.router.add_post("/record", record)
     appasync.router.add_post("/is_speaking", is_speaking)
+    appasync.router.add_get("/download_recording", download_recording)  # 修改为GET方法
     appasync.router.add_static('/', path='web')
 
     # 为根路径添加处理程序，重定向到dashboard.html
