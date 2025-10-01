@@ -1,28 +1,49 @@
 import os
 import json
 import wave
+import yaml
+from logger import logger
 import pyaudio  
 from cozepy import COZE_CN_BASE_URL
 from cozepy import Coze, TokenAuth, Message, ChatStatus, MessageContentType  # noqa
 from vosk import Model, KaldiRecognizer, SetLogLevel
 
+# 读取配置文件
+def read_config():
+    config_path = "./conf/app_config.yaml"
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        return config
+    except Exception as e:
+        logger.error(f"Failed to read config file: {e}")
+        # 不返回默认配置
+        return {}
 
-# 从环境变量中获取 coze_api_token 和 workflow_id
-coze_api_token = os.getenv('COZE_API_TOKEN')
-if not coze_api_token:
-    raise ValueError("COZE_API_TOKEN 环境变量未设置")
+# 全局配置对象
+config = read_config()
 
-workflow_id = os.getenv('WORKFLOW_ID')
-if not workflow_id:
-    raise ValueError("WORKFLOW_ID 环境变量未设置")
+# 从配置文件获取参数
+def get_coze_config():
+    llm_config = config.get('llm', {}).get('coze', {})
+    
+    # 处理api_token，如果是环境变量格式则获取环境变量值
+    api_token = llm_config.get('api_token', '')
+    # 处理workflow_id，如果是环境变量格式则获取环境变量值
+    workflow_id = llm_config.get('workflow_id', '')
 
-coze_api_base = COZE_CN_BASE_URL
-
-# 语音识别模块
-import wave
-import json
-from vosk import Model, KaldiRecognizer
-
+    
+    # 验证必要的配置参数
+    if not api_token:
+        raise ValueError("COZE_API_TOKEN 未配置")
+    
+    if not workflow_id:
+        raise ValueError("WORKFLOW_ID 未配置")
+    
+    # 获取base_url
+    base_url = llm_config.get('base_url', COZE_CN_BASE_URL)
+    
+    return api_token, workflow_id, base_url
 
 class SaveWave:
     def __init__(self, model, audio_file):
@@ -61,14 +82,15 @@ class SaveWave:
 class CozeWorkflow:
     def __init__(self):
         # Initialize the Coze client with the provided token and base URL
-        self.coze = Coze(auth=TokenAuth(token=coze_api_token), base_url=coze_api_base)
+        self.coze_api_token, self.workflow_id, self.coze_api_base = get_coze_config()
+        self.coze = Coze(auth=TokenAuth(token=self.coze_api_token), base_url=self.coze_api_base)
         
     def chat_with_coze(self, text):
         
         # Call the coze.workflows.runs.create method to create a workflow run. The create method
         # is a non-streaming chat and will return a WorkflowRunResult class.
         workflow = self.coze.workflows.runs.create(
-            workflow_id=workflow_id,
+            workflow_id=self.workflow_id,
             parameters={
                 "input": text
             },

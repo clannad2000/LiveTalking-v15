@@ -1,9 +1,24 @@
 import time
 import os
+import yaml
 from basereal import BaseReal
 from logger import logger
 import llm_coze
 import re
+
+# 读取配置文件
+def read_config():
+    config_path = "conf/app_config.yaml"
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+        return config
+    except Exception as e:
+        logger.error(f"Failed to read config file: {e}")
+        return None
+
+# 全局配置对象
+config = read_config()
 
 def llm_response(text, nerfreal:BaseReal, type):
     if type == "opai":
@@ -15,22 +30,38 @@ def llm_response(text, nerfreal:BaseReal, type):
     
 def opai_response(message, nerfreal:BaseReal):
     start = time.perf_counter()
+    
+    # 从配置文件获取参数
+    llm_config = config.get('llm', {}).get('opai', {})
+    
+    # 处理api_key，如果是环境变量格式则获取环境变量值
+    api_key = llm_config.get('api_key', '')
+    base_url = llm_config.get('base_url', "")
+    
+    # 如果配置中没有api_key，回退到直接从环境变量获取
+    if not api_key:
+        raise ValueError("OPAI_API_KEY 未配置")
+    
+    if not base_url:
+        raise ValueError("OPAI_API_BASE_URL 未配置")
+    
     from openai import OpenAI
     client = OpenAI(
-        # 如果您没有配置环境变量，请在此处用您的API Key进行替换
-        api_key=os.getenv("DASHSCOPE_API_KEY"),
-        # 填写DashScope SDK的base_url
-        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        api_key=api_key,
+        base_url=base_url,
     )
+    
     end = time.perf_counter()
     logger.info(f"llm Time init: {end-start}s")
+    
     completion = client.chat.completions.create(
-        model="qwen-plus",
-        messages=[{'role': 'system', 'content': 'You are a helpful assistant.'},
-                  {'role': 'user', 'content': message}],
-        stream=True,
-        # 通过以下设置，在流式输出的最后一行展示token使用信息
-        stream_options={"include_usage": True}
+        model=llm_config.get('model', "qwen-plus"),
+        messages=[
+            {'role': 'system', 'content': llm_config.get('system_prompt', 'You are a helpful assistant.')},
+            {'role': 'user', 'content': message}
+        ],
+        stream=llm_config.get('stream', True),
+        stream_options=llm_config.get('stream_options', {"include_usage": True})
     )
     result=""
     first = True

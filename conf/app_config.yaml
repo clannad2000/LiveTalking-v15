@@ -1,0 +1,56 @@
+# 服务器配置
+server:
+  # 基本参数配置
+  fps: 50         # audio fps,must be 50
+  l: 10
+  r: 10
+
+  # avatar 相关配置
+  avatar_id: avator_3_480p       # define which avatar in data/avatars
+  bbox_shift: 0
+  batch_size: 25            # infer batch
+
+  # 自定义视频配置
+  customvideo_config: ""    # custom action json
+
+  # TTS 配置
+  tts: edgetts              # tts service type (xtts gpt-sovits cosyvoice)
+  REF_FILE: zh-CN-XiaoyiNeural
+  REF_TEXT: null
+  TTS_SERVER: http://127.0.0.1:9880  # http://localhost:9000
+
+  # 模型 配置
+  model: musetalkv15           # musetalk wav2lip ultralight
+
+  # 传输配置
+  transport: webrtc        # webrtc rtcpush virtualcam
+  # when use rtcpush, you can use push_url to set the url
+  # push_url: "http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream"  # rtmp://localhost/live/livestream
+
+
+  # 会话和服务器配置
+  max_session: 3            # multi session count
+  listenport: 8010          # web listen port
+  ssl_cert: "./ssl/certificate.crt"              # Path to SSL certificate file
+  ssl_key: "./ssl/private.key"               # Path to SSL private key file
+
+
+  llm_type: "coze"  # 可以是 "coze" 或 "opai" 
+
+# LLM配置
+llm:
+  # OpenAI兼容API配置
+  opai:
+    api_key: "YOUR_OPENAI_API_KEY"  # OpenAI API密钥
+    base_url: "https://api.openai.com/v1"  # DashScope SDK的base_url
+    model: "qwen-plus"  # 使用的模型名称
+    system_prompt: "You are a helpful assistant."  # 系统提示词
+    stream: true  # 是否使用流式输出
+    stream_options: 
+      include_usage: true  # 是否在流式输出的最后一行展示token使用信息
+  
+  # Coze配置
+  coze:
+    api_token: "pat_gba5KGXh3kFjT0PXjMuxNwwIGhm0o5mvtmDJwgXEHz7fslqM5JXxE7RiB0fSS2aw"  # Coze API令牌
+    workflow_id: "7543220747692884031"  # Coze工作流ID
+    base_url: "https://api.coze.cn"  # Coze API基础URL,可以不填,默认值为 https://api.coze.cn/

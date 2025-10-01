@@ -20,6 +20,7 @@ from flask import Flask, render_template, send_from_directory, request, jsonify
 from flask_sockets import Sockets
 import base64
 import json
+import yaml
 #import gevent
 #from gevent import pywsgi
 #from geventwebsocket.handler import WebSocketHandler
@@ -41,7 +42,6 @@ from basereal import BaseReal
 from llm import llm_response
 from pydub import AudioSegment
 import os
-import argparse
 import random
 import shutil
 import asyncio
@@ -307,7 +307,7 @@ async def human(request):
                 nerfreals[sessionid].put_msg_txt(params['text'])
             elif params['type'] == 'chat':
                 chatText = params['text']
-                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], opt.llm_type)
         elif content_type == 'form':
             audiofile = params.get('audio')
             if audiofile:
@@ -318,7 +318,7 @@ async def human(request):
                         text=json.dumps({"code": -1, "data": "Recognized text is too short"}),
                         status=400
                     )
-                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], "coze")
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, nerfreals[sessionid], opt.llm_type)
 
         return web.Response(
             content_type="application/json",
@@ -665,58 +665,39 @@ async def run(push_url, sessionid):
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
-    parser = argparse.ArgumentParser()
-
-    # audio FPS
-    parser.add_argument('--fps', type=int, default=50, help="audio fps,must be 50")
-    # sliding window left-middle-right length (unit: 20ms)
-    parser.add_argument('-l', type=int, default=10)
-    parser.add_argument('-m', type=int, default=8)
-    parser.add_argument('-r', type=int, default=10)
-
-    parser.add_argument('--W', type=int, default=450, help="GUI width")
-    parser.add_argument('--H', type=int, default=450, help="GUI height")
-
-    # musetalk opt
-    parser.add_argument('--avatar_id', type=str, default='avator_1', help="define which avatar in data/avatars")
-    parser.add_argument('--bbox_shift', type=int, default=0)
-    parser.add_argument('--batch_size', type=int, default=25, help="infer batch")
-
-    parser.add_argument('--customvideo_config', type=str, default='', help="custom action json")
-
-    parser.add_argument('--tts', type=str, default='edgetts', help="tts service type")  # xtts gpt-sovits cosyvoice
-    parser.add_argument('--REF_FILE', type=str, default="zh-CN-XiaoyiNeural")
-    parser.add_argument('--REF_TEXT', type=str, default=None)
-    parser.add_argument('--TTS_SERVER', type=str, default='http://127.0.0.1:9880')  # http://localhost:9000
-    # parser.add_argument('--CHARACTER', type=str, default='test')
-    # parser.add_argument('--EMOTION', type=str, default='default')
-
-    parser.add_argument('--model', type=str, default='musetalk')  # musetalk wav2lip ultralight
-
-    parser.add_argument('--transport', type=str, default='rtcpush')  # webrtc rtcpush virtualcam
-    parser.add_argument('--push_url', type=str, default='http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream')  # rtmp://localhost/live/livestream
-
-    parser.add_argument('--max_session', type=int, default=3)  # multi session count
-    parser.add_argument('--listenport', type=int, default=8010, help="web listen port")
-    parser.add_argument('--ssl_cert', type=str, default='', help="Path to SSL certificate file")
-    parser.add_argument('--ssl_key', type=str, default='', help="Path to SSL private key file")
-
-    opt = parser.parse_args()
+    
+    # 从YAML配置文件读取参数
+    with open('conf/app_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # 创建opt对象，包含所有配置参数
+    opt = type('Options', (), config['server'])()
+    
+    # 初始化customopt（如果有自定义视频配置）
     opt.customopt = []
-    if opt.customvideo_config != '':
-        with open(opt.customvideo_config, 'r') as file:
-            opt.customopt = json.load(file)
-
+    if hasattr(opt, 'customvideo_config') and opt.customvideo_config != '':
+        try:
+            with open(opt.customvideo_config, 'r') as file:
+                # 根据文件扩展名决定使用json还是yaml
+                if opt.customvideo_config.endswith('.yaml') or opt.customvideo_config.endswith('.yml'):
+                    opt.customopt = yaml.safe_load(file)
+                else:
+                    opt.customopt = json.load(file)
+        except Exception as e:
+            logger.error(f"Failed to load custom video config: {e}")
+    
+    # 模型加载信息映射
     model_load_info = {
         'musetalk': (1.0, 0),
         'musetalkv15': (1.5, 0),
-        'wav2lip': ("./models/wav2lip.pth", 256),
+        'wav2lip': ("models/wav2lip.pth", 256),
         'ultralight': (opt, 160)
     }
-
+    
+    # 根据配置的模型类型加载相应的模块和函数
     if opt.model in model_load_info:
         from_module = 'musereal' if 'musetalk' in opt.model else \
-                      'lipreal' if opt.model == 'wav2lip' else 'lightreal'
+                     'lipreal' if opt.model == 'wav2lip' else 'lightreal'
         module = __import__(from_module, fromlist=['load_model', 'load_avatar', 'warm_up'])
         load_model = module.load_model
         load_avatar = module.load_avatar
