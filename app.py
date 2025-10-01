@@ -743,8 +743,8 @@ if __name__ == '__main__':
     # 配置Swagger文档
     setup_swagger(
         appasync,
-        swagger_from_file='./conf/test.yaml', 
-        swagger_url='/api/doc', 
+        swagger_from_file='./conf/swagger_fixed.yaml', 
+        swagger_url='/api/docs', 
         title='API doc'
     )
     

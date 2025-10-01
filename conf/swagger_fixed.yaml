@@ -32,17 +32,27 @@ paths:
           schema:
             type: object
             properties:
-              sdp: {type: string, description: WebRTC offer SDP}
-              type: {type: string, description: WebRTC offer type}
+              sdp:
+                type: string
+                description: WebRTC offer SDP
+              type:
+                type: string
+                description: WebRTC offer type
       responses:
         200:
           description: Connection established successfully
           schema:
             type: object
             properties:
-              sdp: {type: string, description: WebRTC answer SDP}
-              type: {type: string, description: WebRTC answer type}
-              sessionid: {type: integer, description: Session ID}
+              sdp:
+                type: string
+                description: WebRTC answer SDP
+              type:
+                type: string
+                description: WebRTC answer type
+              sessionid:
+                type: integer
+                description: Session ID
         400:
           description: Maximum number of sessions reached
         500:
@@ -61,12 +71,18 @@ paths:
           schema:
             type: object
             properties:
-              sessionid: {type: integer, description: Session ID}
+              sessionid:
+                type: integer
+                description: Session ID
               type:
                 type: string
                 description: "Interaction type - valid values are 'echo' or 'chat'"
-              text: {type: string, description: Text content}
-              interrupt: {type: boolean, description: Whether to interrupt current conversation}
+              text:
+                type: string
+                description: Text content
+              interrupt:
+                type: boolean
+                description: Whether to interrupt current conversation
       responses:
         200:
           description: Processing successful
@@ -111,9 +127,15 @@ paths:
           schema:
             type: object
             properties:
-              sessionid: {type: integer, description: Session ID}
-              audiotype: {type: string, description: Audio type}
-              reinit: {type: boolean, description: Whether to reinitialize}
+              sessionid:
+                type: integer
+                description: Session ID
+              audiotype:
+                type: string
+                description: Audio type
+              reinit:
+                type: boolean
+                description: Whether to reinitialize
       responses:
         200:
           description: Setting successful
@@ -133,7 +155,9 @@ paths:
           schema:
             type: object
             properties:
-              sessionid: {type: integer, description: Session ID}
+              sessionid:
+                type: integer
+                description: Session ID
               type:
                 type: string
                 description: "Recording type - valid values are 'start_record' or 'end_record'"
@@ -156,7 +180,9 @@ paths:
           schema:
             type: object
             properties:
-              sessionid: {type: integer, description: Session ID}
+              sessionid:
+                type: integer
+                description: Session ID
       responses:
         200:
           description: Query successful
