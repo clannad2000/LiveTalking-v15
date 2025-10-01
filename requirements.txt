@@ -18,7 +18,7 @@ face_alignment
 python_speech_features
 numba
 resampy
-#pyaudio
+pyaudio
 soundfile==0.12.1
 einops
 configargparse
@@ -41,3 +41,7 @@ accelerate
 
 librosa
 openai
+aiohttp-swagger
+cozepy
+vosk
+pydub

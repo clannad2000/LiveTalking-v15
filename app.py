@@ -34,7 +34,7 @@ import aiohttp
 import aiohttp_cors
 from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceServer, RTCConfiguration
 from aiortc.rtcrtpsender import RTCRtpSender
-from swagger_ui import aiohttp_api_doc
+from aiohttp_swagger import setup_swagger
 from llm_coze import SaveWave
 from webrtc import HumanPlayer
 from basereal import BaseReal
@@ -61,7 +61,7 @@ avatar = None
 
 pcs = set()
 
-vosk_model = Model("/workspace/voice-ai-persion/vosk-model-cn-0.22")
+vosk_model = Model("../voice-ai-persion/vosk-model-cn-0.22")
 
 def randN(N) -> int:
     """生成长度为 N 的随机数"""
@@ -696,7 +696,7 @@ if __name__ == '__main__':
     parser.add_argument('--transport', type=str, default='rtcpush')  # webrtc rtcpush virtualcam
     parser.add_argument('--push_url', type=str, default='http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream')  # rtmp://localhost/live/livestream
 
-    parser.add_argument('--max_session', type=int, default=1)  # multi session count
+    parser.add_argument('--max_session', type=int, default=3)  # multi session count
     parser.add_argument('--listenport', type=int, default=8010, help="web listen port")
     parser.add_argument('--ssl_cert', type=str, default='', help="Path to SSL certificate file")
     parser.add_argument('--ssl_key', type=str, default='', help="Path to SSL private key file")
@@ -741,9 +741,11 @@ if __name__ == '__main__':
     appasync.on_shutdown.append(on_shutdown)
     
     # 配置Swagger文档
-    aiohttp_api_doc(
+    setup_swagger(
         appasync,
-         config_path='./conf/test.yaml', url_prefix='/api/doc', title='API doc'
+        swagger_from_file='./conf/test.yaml', 
+        swagger_url='/api/doc', 
+        title='API doc'
     )
     
     # API路由
