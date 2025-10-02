@@ -70,6 +70,7 @@ def load_model(version):
 def load_avatar(avatar_id):
     """加载角色资源"""
     avatar_path = f"./data/avatars/{avatar_id}"
+    logger.info(f"Loading avatar from: {avatar_path}")
     paths = {
         "full_imgs": f"{avatar_path}/full_imgs",
         "coords": f"{avatar_path}/coords.pkl",
@@ -239,6 +240,17 @@ class MuseReal(BaseReal):
 
     def paste_back_frame(self, pred_frame, idx: int):
         """将预测帧粘贴回原始帧"""
+        # 安全地访问列表，防止索引越界或NoneType错误
+        if (self.coord_list_cycle is None or self.frame_list_cycle is None or 
+            self.mask_list_cycle is None or self.mask_coords_list_cycle is None or
+            idx >= len(self.coord_list_cycle) or idx >= len(self.frame_list_cycle) or
+            idx >= len(self.mask_list_cycle) or idx >= len(self.mask_coords_list_cycle)):
+            logger.warning(f"List is None or index out of range, skipping frame for session {getattr(self, 'sessionid', 'unknown')}")
+            # 返回一个空的黑色帧作为备选方案
+            height = getattr(self, 'height', 720)
+            width = getattr(self, 'width', 1280)
+            return np.zeros((height, width, 3), dtype=np.uint8)
+            
         bbox = self.coord_list_cycle[idx]
         ori_frame = copy.deepcopy(self.frame_list_cycle[idx])
         x1, y1, x2, y2 = bbox
@@ -280,4 +292,3 @@ class MuseReal(BaseReal):
 
         self.render_event.clear()
         logger.info('musereal thread stop')
-            

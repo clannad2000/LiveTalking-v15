@@ -101,6 +101,11 @@ class BaseReal:
         self.custom_index = {}
         self.custom_opt = {}
         self.__loadcustom()
+        
+        # Initialize frame_list_cycle and related attributes to avoid NoneType errors
+        self.frame_list_cycle = []
+        self.face_list_cycle = []
+        self.coord_list_cycle = []
 
     def put_msg_txt(self,msg,eventpoint=None):
         self.tts.put_msg_txt(msg,eventpoint)
@@ -315,8 +320,21 @@ class BaseReal:
         
         while not quit_event.is_set():
             try:
-                res_frame,idx,audio_frames = self.res_frame_queue.get(block=True, timeout=1)
+                queue_item = self.res_frame_queue.get(block=True, timeout=1)
+                # 处理新的4元素格式 (res_frame, idx, audio_frames, avatar_generation)
+                if len(queue_item) == 4:
+                    res_frame, idx, audio_frames, frame_avatar_generation = queue_item
+                    # 检查avatar generation是否匹配，如果不匹配则跳过此帧
+                    if hasattr(self, 'avatar_generation') and frame_avatar_generation != self.avatar_generation:
+                        logger.info(f"Skipping stale frame from avatar generation {frame_avatar_generation}, current generation {getattr(self, 'avatar_generation', 'unknown')}")
+                        continue
+                else:
+                    # 向后兼容旧的3元素格式
+                    res_frame, idx, audio_frames = queue_item
             except queue.Empty:
+                continue
+            except Exception as e:
+                logger.warning(f"Error processing queue item: {e}")
                 continue
             
             if enable_transition:
@@ -335,7 +353,15 @@ class BaseReal:
                     target_frame = self.custom_img_cycle[audiotype][mirindex]
                     self.custom_index[audiotype] += 1
                 else:
-                    target_frame = self.frame_list_cycle[idx]
+                    # 确保frame_list_cycle不为None且不为空，避免NoneType错误
+                    if not hasattr(self, 'frame_list_cycle') or self.frame_list_cycle is None or len(self.frame_list_cycle) == 0:
+                        #logger.warning(f"frame_list_cycle is not properly initialized for session {self.sessionid}")
+                        # 使用默认黑色帧作为替代
+                        target_frame = np.zeros((self.height or 480, self.width or 640, 3), dtype=np.uint8)
+                    else:
+                        # 确保索引在有效范围内
+                        safe_idx = idx % len(self.frame_list_cycle) if len(self.frame_list_cycle) > 0 else 0
+                        target_frame = self.frame_list_cycle[safe_idx]
                 
                 if enable_transition:
                     # 说话→静音过渡

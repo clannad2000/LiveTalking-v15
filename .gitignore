@@ -30,3 +30,5 @@ Thumbs.db
 *.build
 *.cache
 *.temp
+
+conf/app_config.yaml
