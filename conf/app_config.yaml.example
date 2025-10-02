@@ -5,7 +5,7 @@ server:
   l: 10
   r: 10
 
-  # avatar 相关配置
+  # avatar 相关配置 <先修改>
   avatar_id: avator_3_480p       # define which avatar in data/avatars
   bbox_shift: 0
   batch_size: 25            # infer batch
@@ -39,8 +39,8 @@ server:
 
 # LLM配置
 llm:
-  # OpenAI兼容API配置
-  opai:
+  # OpenAI兼容API配置 <先修改>
+  openai:
     api_key: "YOUR_OPENAI_API_KEY"  # OpenAI API密钥
     base_url: "https://api.openai.com/v1"  # DashScope SDK的base_url
     model: "qwen-plus"  # 使用的模型名称
@@ -49,8 +49,8 @@ llm:
     stream_options: 
       include_usage: true  # 是否在流式输出的最后一行展示token使用信息
   
-  # Coze配置
+  # Coze配置  <先修改>
   coze:
-    api_token: "pat_gba5KGXh3kFjT0PXjMuxNwwIGhm0o5mvtmDJwgXEHz7fslqM5JXxE7RiB0fSS2aw"  # Coze API令牌
-    workflow_id: "7543220747692884031"  # Coze工作流ID
+    api_token: "pat_gbaxxxxx"  # Coze API令牌
+    workflow_id: "754xxxxxxx"  # Coze工作流ID
     base_url: "https://api.coze.cn"  # Coze API基础URL,可以不填,默认值为 https://api.coze.cn/
