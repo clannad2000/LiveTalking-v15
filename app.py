@@ -729,6 +729,10 @@ if __name__ == '__main__':
         title='API doc'
     )
     
+    # 注册配置管理的API路由
+    from config_manager import config_manager
+    config_manager.register_routes(appasync)
+    
     # API路由
     appasync.router.add_post("/offer", offer)
     appasync.router.add_post("/human", human)
