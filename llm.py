@@ -1,40 +1,31 @@
 import time
 import os
-import yaml
 from basereal import BaseReal
 from logger import logger
 import llm_coze
 import re
+from config_manager import g_config_manager
 
-# 读取配置文件
-def read_config():
-    config_path = "conf/app_config.yaml"
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        return config
-    except Exception as e:
-        logger.error(f"Failed to read config file: {e}")
-        return None
-
-# 全局配置对象
-config = read_config()
-
-def llm_response(text, nerfreal:BaseReal, type):
-    if type == "opai":
+def llm_response(text, nerfreal:BaseReal, llm_type):
+    if llm_type == "openai":
         return opai_response(text, nerfreal)
-    elif type == "coze":
+    elif llm_type == "coze":
         return coze_response(text, nerfreal)
     else:
-        raise ValueError(f"Unsupported LLM type: {type}")
+        raise ValueError(f"Unsupported LLM type: {llm_type}")
     
 def opai_response(message, nerfreal:BaseReal):
     start = time.perf_counter()
     
-    # 从配置文件获取参数
-    llm_config = config.get('llm', {}).get('opai', {})
+    # 从配置管理器获取参数
+    llm = g_config_manager.get_config('llm')
+    llm_config = llm.get('openai', {}) if llm else {}
     
-    # 处理api_key，如果是环境变量格式则获取环境变量值
+    # 处理嵌套的openai配置结构
+    if isinstance(llm_config, dict) and 'openai' in llm_config:
+        llm_config = llm_config['openai']
+    
+    # 处理api_key
     api_key = llm_config.get('api_key', '')
     base_url = llm_config.get('base_url', "")
     

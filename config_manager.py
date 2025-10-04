@@ -183,6 +183,9 @@ class ConfigManager:
                 old_value = self._config[section].get(key)
                 self._config[section][key] = value
                 logger.info(f"Updated config {section}.{key}: {old_value} -> {value}")
+
+        logger.info(f"Updated configs: {updates}")
+        logger.info(f"self._config: {self._config}")
         
         # 不保存到文件，只更新内存中的配置
         return True, []
@@ -854,4 +857,4 @@ class ConfigManager:
                 logger.info(f"Added CORS to config route: {route}")
 
 # 创建全局配置管理器实例
-config_manager = ConfigManager()
+g_config_manager = ConfigManager()

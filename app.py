@@ -48,6 +48,7 @@ import asyncio
 import torch
 from typing import Dict
 from logger import logger
+from config_manager import g_config_manager
 from vosk import Model
 import tempfile
 import ssl
@@ -272,6 +273,10 @@ async def human(context: AppContext, request):
         if sessionid in context.nerfreals and params.get('interrupt'):
             context.nerfreals[sessionid].flush_talk()
 
+        # 从配置管理器获取llm_type，而不是从context.opt中获取
+        llm_type = g_config_manager.get_config('server', 'llm_type')
+        logger.info(f"function human : llm_type from config_manager: {llm_type}")
+
         chatText = None
         llm_result = None
         if content_type == 'json':
@@ -279,7 +284,7 @@ async def human(context: AppContext, request):
                 context.nerfreals[sessionid].put_msg_txt(params['text'])
             elif params['type'] == 'chat':
                 chatText = params['text']
-                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, context.nerfreals[sessionid], context.opt.llm_type)
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, context.nerfreals[sessionid], llm_type)
         elif content_type == 'form':
             audiofile = params.get('audio')
             if audiofile:
@@ -290,7 +295,7 @@ async def human(context: AppContext, request):
                         text=json.dumps({"code": -1, "data": "Recognized text is too short"}),
                         status=400
                     )
-                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, context.nerfreals[sessionid], context.opt.llm_type)
+                llm_result = await asyncio.get_event_loop().run_in_executor(None, llm_response, chatText, context.nerfreals[sessionid], llm_type)
 
         return web.Response(
             content_type="application/json",
@@ -435,10 +440,9 @@ async def run(context: AppContext):
     context.appasync = web.Application(client_max_size=1024**2*100)
     
     # 注册配置管理的API路由
-    from config_manager import ConfigManager
-    config_manager = ConfigManager()
-    config_manager.set_app_context(context)
-    config_manager.register_routes(context.appasync)
+    from config_manager import g_config_manager
+    g_config_manager.set_app_context(context)
+    g_config_manager.register_routes(context.appasync)
     
     # 配置Swagger文档
     setup_swagger(
@@ -625,23 +629,18 @@ def main():
         # 初始化应用上下文
         app_context = AppContext.get_instance()
         
-        # 从YAML配置文件读取参数
-        with open('conf/app_config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
+        # 从配置管理器获取服务器配置
+        server_config = g_config_manager.get_config('server')
         
         # 创建opt对象，包含所有配置参数
-        app_context.opt = type('Options', (), config['server'])()
+        app_context.opt = type('Options', (), server_config)()
         
         # 初始化customopt（如果有自定义视频配置）
         app_context.opt.customopt = []
         if hasattr(app_context.opt, 'customvideo_config') and app_context.opt.customvideo_config != '':
             try:
-                with open(app_context.opt.customvideo_config, 'r') as file:
-                    # 根据文件扩展名决定使用json还是yaml
-                    if app_context.opt.customvideo_config.endswith('.yaml') or app_context.opt.customvideo_config.endswith('.yml'):
-                        app_context.opt.customopt = yaml.safe_load(file)
-                    else:
-                        app_context.opt.customopt = json.load(file)
+                # 尝试从g_config_manager直接获取customopt配置
+                customopt_config = g_config_manager.get_config('customopt')
             except Exception as e:
                 logger.error(f"Failed to load custom video config: {e}")
         
