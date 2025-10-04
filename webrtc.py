@@ -39,6 +39,7 @@ AUDIO_TIME_BASE = fractions.Fraction(1, SAMPLE_RATE)
 from aiortc import (
     MediaStreamTrack,
 )
+from aiortc.contrib.media import MediaRelay
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ class PlayerStreamTrack(MediaStreamTrack):
                 self._timestamp += int(VIDEO_PTIME * VIDEO_CLOCK_RATE)
                 self.current_frame_count += 1
                 wait = self._start + self.current_frame_count * VIDEO_PTIME - time.time()
-                # wait = self.timelist[0] + len(self.timelist)*VIDEO_PTIME - time.time()               
+                # wait = self.timelist[0] + len(self.timelist)*VIDEO_PTIME - time.time()                
                 if wait>0:
                     await asyncio.sleep(wait)
                 # if len(self.timelist)>=100:
@@ -163,7 +164,7 @@ def player_worker_thread(
 class HumanPlayer:
 
     def __init__(
-        self, nerfreal, format=None, options=None, timeout=None, loop=False, decode=True
+        self, nerfreal, format=None, options=None, timeout=None, loop=False, decode=True, turn_config=None
     ):
         self.__thread: Optional[threading.Thread] = None
         self.__thread_quit: Optional[threading.Event] = None
@@ -177,6 +178,9 @@ class HumanPlayer:
         self.__video = PlayerStreamTrack(self, kind="video")
 
         self.__container = nerfreal
+        # 初始化MediaRelay用于TURN服务器配置
+        self.__relay = MediaRelay()
+        self.__turn_config = turn_config
 
     def notify(self,eventpoint):
         self.__container.notify(eventpoint)
@@ -195,6 +199,13 @@ class HumanPlayer:
         """
         return self.__video
 
+    @property
+    def rtc_config(self) -> Dict:
+        """
+        获取WebRTC连接配置，包括TURN服务器设置
+        """
+        return create_rtc_config(self.__turn_config)
+
     def _start(self, track: PlayerStreamTrack) -> None:
         self.__started.add(track)
         if self.__thread is None:
@@ -208,7 +219,7 @@ class HumanPlayer:
                     asyncio.get_event_loop(),
                     self.__container,
                     self.__audio,
-                    self.__video                   
+                    self.__video                    
                 ),
             )
             self.__thread.start()
@@ -228,3 +239,29 @@ class HumanPlayer:
 
     def __log_debug(self, msg: str, *args) -> None:
         mylogger.debug(f"HumanPlayer {msg}", *args)
+
+# 用于配置TURN服务器的函数
+def create_rtc_config(turn_config=None):
+    """
+    创建WebRTC连接配置，支持TURN服务器设置
+    
+    参数:
+        turn_config: TURN服务器配置字典，包含urls, username, credential等
+    
+    返回:
+        RTCConfiguration对象，可用于WebRTC连接
+    """
+    rtc_config = {}
+    
+    if turn_config and turn_config.get('turn_provider') == 'turn_server':
+        ice_servers = []
+        turn_servers = {
+            'urls': turn_config.get('urls', []),
+            'username': turn_config.get('username', ''),
+            'credential': turn_config.get('credential', '')
+        }
+        ice_servers.append(turn_servers)
+        rtc_config['iceServers'] = ice_servers
+        mylogger.info(f"TURN服务器配置已设置: {turn_config.get('urls')}")
+    
+    return rtc_config

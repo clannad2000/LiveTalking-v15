@@ -145,8 +145,28 @@ async def offer(context: AppContext, request):
         context.nerfreals[sessionid] = nerfreal
         logger.info('Session created with sessionid=%d', sessionid)
 
-        ice_server1 = RTCIceServer(urls='stun:stun.miwifi.com:3478')
-        pc = RTCPeerConnection(configuration=RTCConfiguration(iceServers=[ice_server1]))
+        # 获取TURN服务器配置
+        turn_config = params.get("turn_config")
+        player = HumanPlayer(context.nerfreals[sessionid], turn_config=turn_config)
+        
+        # 使用HumanPlayer的rtc_config属性设置RTCPeerConnection的配置
+        if hasattr(player, 'rtc_config') and player.rtc_config:
+            # 构建ICE服务器配置
+            config = RTCConfiguration()
+            if 'iceServers' in player.rtc_config:
+                ice_servers = []
+                for server in player.rtc_config['iceServers']:
+                    ice_server = RTCIceServer(
+                        urls=server.get('urls', []),
+                        username=server.get('username', ''),
+                        credential=server.get('credential', '')
+                    )
+                    ice_servers.append(ice_server)
+                config.iceServers = ice_servers
+            pc = RTCPeerConnection(configuration=config)
+        else:
+            ice_server1 = RTCIceServer(urls='stun:stun.miwifi.com:3478')
+            pc = RTCPeerConnection(configuration=RTCConfiguration(iceServers=[ice_server1]))
         context.pcs.add(pc)
 
         @pc.on("connectionstatechange")
@@ -163,7 +183,7 @@ async def offer(context: AppContext, request):
                 else:
                     logger.warning('Session with sessionid=%d not found when trying to delete', sessionid)
 
-        player = HumanPlayer(context.nerfreals[sessionid])
+
         audio_sender = pc.addTrack(player.audio)
         video_sender = pc.addTrack(player.video)
         capabilities = RTCRtpSender.getCapabilities("video")
@@ -553,7 +573,28 @@ async def run_rtcpush_session(push_url, sessionid, context: AppContext):
     nerfreal = await asyncio.get_event_loop().run_in_executor(None, build_nerfreal, sessionid, context)
     context.nerfreals[sessionid] = nerfreal
 
-    pc = RTCPeerConnection()
+    # RTCPush模式的主要处理逻辑
+    # 设置TURN服务器配置
+    turn_config = getattr(context.opt, 'turn_config', None)
+    player = HumanPlayer(context.nerfreals[sessionid], turn_config=turn_config)
+    
+    # 使用HumanPlayer的rtc_config属性设置RTCPeerConnection的配置
+    if hasattr(player, 'rtc_config') and player.rtc_config:
+        # 构建ICE服务器配置
+        config = RTCConfiguration()
+        if 'iceServers' in player.rtc_config:
+            ice_servers = []
+            for server in player.rtc_config['iceServers']:
+                ice_server = RTCIceServer(
+                    urls=server.get('urls', []),
+                    username=server.get('username', ''),
+                    credential=server.get('credential', '')
+                )
+                ice_servers.append(ice_server)
+            config.iceServers = ice_servers
+        pc = RTCPeerConnection(configuration=config)
+    else:
+        pc = RTCPeerConnection()
     context.pcs.add(pc)
 
     @pc.on("connectionstatechange")
@@ -563,7 +604,7 @@ async def run_rtcpush_session(push_url, sessionid, context: AppContext):
             await pc.close()
             context.pcs.discard(pc)
 
-    player = HumanPlayer(context.nerfreals[sessionid])
+    # 添加音频和视频轨道
     audio_sender = pc.addTrack(player.audio)
     video_sender = pc.addTrack(player.video)
 
