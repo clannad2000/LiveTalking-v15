@@ -166,6 +166,7 @@ async def offer(context: AppContext, request):
                 config.iceServers = ice_servers
             pc = RTCPeerConnection(configuration=config)
         else:
+            logger.info('No rtc_config provided, using default STUN server')
             ice_server1 = RTCIceServer(urls='stun:stun.miwifi.com:3478')
             pc = RTCPeerConnection(configuration=RTCConfiguration(iceServers=[ice_server1]))
         context.pcs.add(pc)

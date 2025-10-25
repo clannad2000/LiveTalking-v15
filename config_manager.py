@@ -162,34 +162,6 @@ class ConfigManager:
         # 不保存到文件，只更新内存中的配置
         return True
     
-    def update_multiple_configs(self, updates: Dict[str, Dict[str, Any]]) -> Tuple[bool, list]:
-        """
-        批量更新配置（只更新内存中的配置，不写入配置文件）
-        
-        Args:
-            updates: 要更新的配置字典，格式为 {section: {key: value}}
-            
-        Returns:
-            (是否全部更新成功, 失败的配置项列表)
-        """
-        failed_updates = []
-        
-        # 只在内存中更新所有配置
-        for section, keys_values in updates.items():
-            if section not in self._config:
-                self._config[section] = {}
-                
-            for key, value in keys_values.items():
-                old_value = self._config[section].get(key)
-                self._config[section][key] = value
-                logger.info(f"Updated config {section}.{key}: {old_value} -> {value}")
-
-        logger.info(f"Updated configs: {updates}")
-        logger.info(f"self._config: {self._config}")
-        
-        # 不保存到文件，只更新内存中的配置
-        return True, []
-    
     def get_model_config(self) -> Dict[str, Any]:
         """获取模型相关配置"""
         llm_type = self.get_config('server', 'llm_type')
@@ -201,12 +173,12 @@ class ConfigManager:
             'llm': llm
         }
     
-    def update_model_config(self, model_config):
+    def update_model_config(self, update_config : Dict[str, Any]) -> Dict[str, Any]:
         """
-        更新模型配置，包括模型类型、头像ID、LLM类型等
+        更新模型配置，包括头像ID、LLM类型和LLM配置等
         
         Args:
-            model_config: 包含模型配置的字典
+            update_config: 包含模型配置的字典
         
         Returns:
             dict: 更新后的配置
@@ -217,34 +189,37 @@ class ConfigManager:
             # 记录开始时间
             start_time = time.time()
             
+            # 1. 更新头像
             # 保存旧的头像ID，用于判断是否需要更新全局头像
             old_avatar_id = self.get_config('server', 'avatar_id')
             logger.info(f"Current avatar ID: {old_avatar_id}")
             
-            # 构建更新配置的字典
-            update_configs = {
-                'server': {
-                    'model': model_config.get('model'),
-                    'avatar_id': model_config.get('avatar_id'),
-                    'llm_type': model_config.get('llm_type')
-                }
-            }
-            
-            # 添加LLM相关配置（如果有）
-            if 'llm' in model_config:
-                update_configs['llm'] = model_config['llm']
-            
-            # 应用配置更改
-            result = self.update_multiple_configs(update_configs)
-            
             # 获取新的头像ID
-            new_avatar_id = self.get_config('server', 'avatar_id')
+            new_avatar_id = update_config.get('avatar_id')
             logger.info(f"Updated avatar ID to: {new_avatar_id}")
             
             # 如果头像ID发生变化，尝试更新全局头像和所有活跃会话
-            if new_avatar_id != old_avatar_id and new_avatar_id:
+            if new_avatar_id != old_avatar_id:
+                self.update_config('server', 'avatar_id', new_avatar_id)
                 logger.info(f"Avatar ID changed from {old_avatar_id} to {new_avatar_id}, initiating global avatar update")
                 self._refresh_all_avatars(new_avatar_id)
+
+            # 2. 更新LLM类型
+            new_llm_type = update_config.get('llm_type')
+            if new_llm_type:
+                self.update_config('server', 'llm_type', new_llm_type)
+                logger.info(f"Updated LLM type to: {new_llm_type}")
+
+            
+            # 3. 更新LLM配置
+            llm_config_new = update_config.get('llm_config').get(new_llm_type)
+            if llm_config_new:
+                self.update_config('llm', new_llm_type, llm_config_new)
+                logger.info(f"Updated LLM config for {new_llm_type}")
+
+
+            logger.info(f"Updated configs: {update_config}")
+            logger.info(f"self._config: {self._config}")
             
             # 记录总耗时
             end_time = time.time()
@@ -794,22 +769,27 @@ class ConfigManager:
         async def update_model_config_handler(request):
             try:
                 data = await request.json()
+
+                logger.info(f"Received model config update request: {data}")
                 # 创建一个包含所有模型配置的字典
-                model_config = {
+                update_config = {
                     'model': data.get('model'),
                     'avatar_id': data.get('avatar_id'),
-                    'llm_type': data.get('llm_type')
+                    'llm_type': data.get('llm_type'),
+                    'llm_config': data.get('llm_config')
                 }
                 
-                # 添加LLM配置（如果有）
-                llm_config = data.get('llm_config')
-                if llm_config and model_config.get('llm_type'):
-                    model_config['llm'] = {
-                        model_config['llm_type']: llm_config
-                    }
+                # # 添加LLM配置（如果有）
+                # llm_config_new = data.get('llm_config')
+                # if llm_config_new and update_config.get('llm_type'):
+                #     update_config['llm'] = {
+                #         update_config['llm_type']: llm_config_new
+                #     }
+
+                logger.info(f"Update config prepared: {update_config}")
                 
                 # 调用更新模型配置的方法
-                result = self.update_model_config(model_config)
+                result = self.update_model_config(update_config)
                 
                 # 格式化响应
                 if isinstance(result, dict) and 'success' in result:
