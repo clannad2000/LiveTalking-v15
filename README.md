@@ -1,6 +1,9 @@
- [English](./README-EN.md) | 中文版   
+ # 本工程在 [LiveTalking](https://gitee.com/lipku/LiveTalking) 的基础上进行开发
 
-# 修改说明
+ 感谢 lipku 大佬的开源，对原工程感兴趣的请前往 [LiveTalking](https://gitee.com/lipku/LiveTalking) 查看。
+  
+
+# 开发说明
 
  1. 新增了musetalkv1.5模型的支持，
  2. 修改了原工程不能使用麦克风的bug
@@ -9,129 +12,186 @@
  5. 对话模式增加了对话记录功能 - 2025-7-18
  6. 增加使用https功能，提供默认ssl证书，不用修改浏览器设置。 - 2025-9-23
  7. 增加麦克风持续收音功能 - 2025-9-23
+ 8. 前后端分离，前端使用vue，后端使用flask。前端工程见 [livetalkingv15-webui](https://gitee.com/brucezhao/livetalkingv15-webui)
+ 9. 新增配置管理功能，支持运行中切换数字人模型，支持运行中修改大语言模型。
+ 10. 增加https支持，默认提供自签名证书，也可以自己提供证书。
+ 11. 修改参数获取方式，从环境变量改为从配置文件中获取。配置文件为 `./conf/app_config.yaml`
  
- 使用教程详见：https://zhuanlan.zhihu.com/p/1926328492125065380
+ <img src="./docs/image.png" alt="配置管理" width="50%" height="50%">
+
  
 
-
-#  原工程 README
-
- 实时交互流式数字人，实现音视频同步对话。基本可以达到商用效果
-[wav2lip效果](https://www.bilibili.com/video/BV1scwBeyELA/) | [ernerf效果](https://www.bilibili.com/video/BV1G1421z73r/) | [musetalk效果](https://www.bilibili.com/video/BV1gm421N7vQ/)
-
-## 为避免与3d数字人混淆，原项目metahuman-stream改名为livetalking，原有链接地址继续可用
-
-## News
-- 2024.12.8 完善多并发，显存不随并发数增加
-- 2024.12.21 添加wav2lip、musetalk模型预热，解决第一次推理卡顿问题。感谢[@heimaojinzhangyz](https://github.com/heimaojinzhangyz)
-- 2024.12.28 添加数字人模型Ultralight-Digital-Human。 感谢[@lijihua2017](https://github.com/lijihua2017)
-- 2025.2.7 添加fish-speech tts
-- 2025.2.21 添加wav2lip256开源模型 感谢@不蠢不蠢
-- 2025.3.2 添加腾讯语音合成服务
-- 2025.3.16 支持mac gpu推理，感谢[@GcsSloop](https://github.com/GcsSloop) 
-- 2025.5.1 精简运行参数，ernerf模型移至git分支ernerf-rtmp
-- 2025.6.7 添加虚拟摄像头输出
-
-## Features
-1. 支持多种数字人模型: ernerf、musetalk、wav2lip、Ultralight-Digital-Human
-2. 支持声音克隆
-3. 支持数字人说话被打断
-4. 支持全身视频拼接
-5. 支持webrtc、虚拟摄像头输出
-6. 支持动作编排：不说话时播放自定义视频
-7. 支持多并发
-
-## 1. Installation
-
-Tested on Ubuntu 24.04, Python3.10, Pytorch 2.5.0 and CUDA 12.4
-
-### 1.1 Install dependency
+# 部署说明
+## 一. LiveTalking-v15 部署
+### 1. 环境准备
+python   3.10
+pytorch  2.4
+cuda     12.4
 
 ```bash
-conda create -n nerfstream python=3.10
-conda activate nerfstream
-#如果cuda版本不为12.4(运行nvidia-smi确认版本)，根据<https://pytorch.org/get-started/previous-versions/>安装对应版本的pytorch 
 conda install pytorch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 pytorch-cuda=12.4 -c pytorch -c nvidia
+```
+
+### 2. 安装依赖
+
+1. 基础依赖
+
+```bash
+git clone https://gitee.com/brucezhao/LiveTalking-v15.git
+git checkout -b front-back-separa origin/front-back-separa
+cd LiveTalking-v15
+
+apt install libasound-dev portaudio19-dev libportaudio2 libportaudiocpp0 libgl1
 pip install -r requirements.txt
-#如果需要训练ernerf模型，安装下面的库
-# pip install "git+https://github.com/facebookresearch/pytorch3d.git"
-# pip install tensorflow-gpu==2.8.0
-# pip install --upgrade "protobuf<=3.20.1"
-``` 
-安装常见问题[FAQ](https://livetalking-doc.readthedocs.io/zh-cn/latest/faq.html)  
-linux cuda环境搭建可以参考这篇文章 <https://zhuanlan.zhihu.com/p/674972886>  
-视频连不上解决方法 <https://mp.weixin.qq.com/s/MVUkxxhV2cgMMHalphr2cg>
 
-
-## 2. Quick Start
-- 下载模型  
-夸克云盘<https://pan.quark.cn/s/83a750323ef0>    
-GoogleDriver <https://drive.google.com/drive/folders/1FOC_MD6wdogyyX_7V1d4NDIO7P9NlSAJ?usp=sharing>  
-将wav2lip256.pth拷到本项目的models下, 重命名为wav2lip.pth;  
-将wav2lip256_avatar1.tar.gz解压后整个文件夹拷到本项目的data/avatars下
-- 运行  
-python app.py --transport webrtc --model wav2lip --avatar_id wav2lip256_avatar1  
-用浏览器打开http://serverip:8010/webrtcapi.html , 先点‘start',播放数字人视频；然后在文本框输入任意文字，提交。数字人播报该段文字  
-<font color=red>服务端需要开放端口 tcp:8010; udp:1-65536 </font>  
-如果需要商用高清wav2lip模型，[链接](https://livetalking-doc.readthedocs.io/zh-cn/latest/service.html#wav2lip) 
-
-- 快速体验  
-<https://www.compshare.cn/images/4458094e-a43d-45fe-9b57-de79253befe4?referral_code=3XW3852OBmnD089hMMrtuU&ytag=GPU_GitHub_livetalking> 用该镜像创建实例即可运行成功
-
-如果访问不了huggingface，在运行前
+# 下载musetalkv1.5模型权重
+./scripts/download_musetalk_weights.sh
+# 下载whisper-tiny模型权重
+wget -O ./models/whisper/tiny.pt https://openaipublic.azureedge.net/main/whisper/models/65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9/tiny.pt
 ```
-export HF_ENDPOINT=https://hf-mirror.com
-``` 
+
+2. 配置本地语音识别模型
+
+```bash
+mkdir /root/voice-ai-persion
+wget -O /root/voice-ai-persion/vosk-model-cn-0.22.zip https://alphacephei.com/vosk/models/vosk-model-cn-0.22.zip
+cd /root/voice-ai-persion
+unzip vosk-model-cn-0.22.zip
+```
+
+3. 修改配置文件
+
+```bash
+cp ./conf/app_config.yaml.example ./conf/app_config.yaml
+vim ./conf/app_config.yaml
+
+```
+
+1. 修改配置文件中的 `avatar_id` 为你自己的数字人模型目录名。
+2. 修改配置文件中的 `llm_type` 为你自己的大语言模型类型。这里支持2种类型："coze" 和 "openai"。
+3. 如果选择 "coze" 类型，需要修改配置文件中的 `coze.api_token` 和 `coze.workflow_id` 为你自己的coze工作流。
+4. 如果选择 "openai" 类型，支持所有openai的api接口（例如阿里百炼，openai等）。
+    - 需要修改配置文件中的 `openai.api_key` 为你自己的openai api key。
+    - 可以修改 `openai.base_url` 为你自己的openai api 地址。
+    - 可以修改 `openai.model` 为你自己的openai模型。
+    - 可以修改 `openai.system_prompt` 为你自己的系统提示词。
+
+```yaml
+# 服务器配置
+server:
+  # 基本参数配置
+  fps: 50         # audio fps,must be 50
+  l: 10
+  r: 10
+
+  # avatar 相关配置 <先修改>
+  avatar_id: avator_3_480p       # define which avatar in data/avatars
+  bbox_shift: 0
+  batch_size: 25            # infer batch
+
+  # 自定义视频配置
+  customvideo_config: ""    # custom action json
+
+  # TTS 配置
+  tts: edgetts              # tts service type (xtts gpt-sovits cosyvoice)
+  REF_FILE: zh-CN-XiaoyiNeural
+  REF_TEXT: null
+  TTS_SERVER: http://127.0.0.1:9880  # http://localhost:9000
+
+  # 模型 配置
+  model: musetalkv15           # musetalk wav2lip ultralight
+
+  # 传输配置
+  transport: webrtc        # webrtc rtcpush virtualcam
+  # when use rtcpush, you can use push_url to set the url
+  # push_url: "http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream"  # rtmp://localhost/live/livestream
 
 
-## 3. More Usage
-使用说明: <https://livetalking-doc.readthedocs.io/>
+  # 会话和服务器配置
+  max_session: 3            # multi session count
+  listenport: 8010          # web listen port
+  ssl_cert: "./ssl/certificate.crt"              # Path to SSL certificate file
+  ssl_key: "./ssl/private.key"               # Path to SSL private key file
+
+
+  llm_type: "coze"  # 可以是 "coze" 或 "opai" 
+
+# LLM配置
+llm:
+  # OpenAI兼容API配置 <先修改>
+  openai:
+    api_key: "YOUR_OPENAI_API_KEY"  # OpenAI API密钥
+    base_url: "https://api.openai.com/v1"  # DashScope SDK的base_url
+    model: "qwen-plus"  # 使用的模型名称
+    system_prompt: "You are a helpful assistant."  # 系统提示词
+    stream: true  # 是否使用流式输出
+    stream_options: 
+      include_usage: true  # 是否在流式输出的最后一行展示token使用信息
   
-## 4. Docker Run  
-不需要前面的安装，直接运行。
+  # Coze配置  <先修改>
+  coze:
+    api_token: "pat_gbaxxxxx"  # Coze API令牌
+    workflow_id: "754xxxxxxx"  # Coze工作流ID
+    base_url: "https://api.coze.cn"  # Coze API基础URL,可以不填,默认值为 https://api.coze.cn/
 ```
-docker run --gpus all -it --network=host --rm registry.cn-beijing.aliyuncs.com/codewithgpu2/lipku-metahuman-stream:2K9qaMBu8v
+
+### 3. 启动服务
+```bash
+python app.py
 ```
-代码在/root/metahuman-stream，先git pull拉一下最新代码，然后执行命令同第2、3步 
+如下图所示，服务启动成功后，会打印出服务地址和端口号。
 
-提供如下镜像
-- autodl镜像: <https://www.codewithgpu.com/i/lipku/metahuman-stream/base>   
-[autodl教程](https://livetalking-doc.readthedocs.io/en/latest/autodl/README.html)
-- ucloud镜像: <https://www.compshare.cn/images/4458094e-a43d-45fe-9b57-de79253befe4?referral_code=3XW3852OBmnD089hMMrtuU&ytag=GPU_GitHub_livetalking>  
-可以开放任意端口，不需要另外部署srs服务.  
-[ucloud教程](https://livetalking-doc.readthedocs.io/en/latest/ucloud/ucloud.html) 
+![](./docs/start.png)
+
+## 二. 前端部署
+
+1. 环境准备
+
+node   v20.5.0
+
+```bash
+git clone https://gitee.com/brucezhao/livetalkingv15-webui.git
+cd livetalkingv15-webui
+
+npm install
+```
+
+2. 修改配置
+
+修改`vite.config.js`中的backend为服务地址和端口号。
+
+![](./docs/backend.png)
 
 
-## 5. 性能
-- 性能主要跟cpu和gpu相关，每路视频压缩需要消耗cpu，cpu性能与视频分辨率正相关；每路口型推理跟gpu性能相关。  
-- 不说话时的并发数跟cpu相关，同时说话的并发数跟gpu相关。  
-- 后端日志inferfps表示显卡推理帧率，finalfps表示最终推流帧率。两者都要在25以上才能实时。如果inferfps在25以上，finalfps达不到25表示cpu性能不足。  
-- 实时推理性能  
+3. 启动前端服务
 
-模型    |显卡型号   |fps
-:----   |:---   |:---
-wav2lip256 | 3060    | 60
-musetalk   | 3080Ti  | 45
-wav2lip256 | 3080Ti  | 120 
+```bash
+npm run dev
+```
 
-wav2lip256显卡3060以上即可，musetalk需要3080Ti以上。 
 
-## 6. 商业版
-提供如下扩展功能，适用于对开源项目已经比较熟悉，需要扩展产品功能的用户
-1. 高清wav2lip模型
-2. 完全语音交互，数字人回答过程中支持通过唤醒词或者按钮打断提问
-3. 实时同步字幕，给前端提供数字人每句话播报开始、结束事件
-4. 每个连接可以指定对应avatar和音色，avatar图片加载加速
-5. 动作编排：不说话时动作、唤醒时动作、思考时动作、进入休眠动作
-6. 支持不限时长的数字人形象avatar
-7. 提供实时音频流输入接口
+如下图所示，前端部署成功后，会打印出服务地址和端口号。
 
-## 7. 声明
-基于本项目开发并发布在B站、视频号、抖音等网站上的视频需带上LiveTalking水印和标识，如需去除请联系作者备案授权。
+![](./docs/qianduan.png)
 
----
-如果本项目对你有帮助，帮忙点个star。也欢迎感兴趣的朋友一起来完善该项目.
-* 知识星球: https://t.zsxq.com/7NMyO 沉淀高质量常见问题、最佳实践经验、问题解答  
-* 微信公众号：数字人技术  
-![](https://mmbiz.qpic.cn/sz_mmbiz_jpg/l3ZibgueFiaeyfaiaLZGuMGQXnhLWxibpJUS2gfs8Dje6JuMY8zu2tVyU9n8Zx1yaNncvKHBMibX0ocehoITy5qQEZg/640?wxfrom=12&tp=wxpic&usePicPrefetch=1&wx_fmt=jpeg&amp;from=appmsg)  
+## 3. 访问服务
 
+使用火狐浏览器打开 http://ip:3000 即可。**[不推荐谷歌浏览器，连接速度较慢]**
+
+访问时会出现安全警告，这是因为我们使用了自签名证书。请点击高级设置，然后确认继续访问即可。
+
+![](./docs/secure.png)
+
+![](./docs/running.png)
+
+选中`使用STUN服务器`，点击`开始连接`即可。
+
+## 使用说明
+
+点击左上角的图标可以修改配置。修改完配置后，需要点击`保存`按钮，才能生效。
+
+**注意： 如果修改了数字人模型，修改成功后，需要先断开当前连接，再重新点击`开始连接`按钮。！！！**
+
+<img src="./docs/image.png" alt="配置管理" width="50%" height="50%">
+
+点击`启用麦克风`按钮，即可启用麦克风。可以与数字人进行连续语音交互。

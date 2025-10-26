@@ -35,7 +35,7 @@ server:
   ssl_key: "./ssl/private.key"               # Path to SSL private key file
 
 
-  llm_type: "coze"  # 可以是 "coze" 或 "opai" 
+  llm_type: "coze"  # 可以是 "coze" 或 "openai" 
 
 # LLM配置
 llm:
