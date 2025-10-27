@@ -195,3 +195,8 @@ npm run dev
 <img src="./docs/image.png" alt="配置管理" width="50%" height="50%">
 
 点击`启用麦克风`按钮，即可启用麦克风。可以与数字人进行连续语音交互。
+
+# 快速体验
+
+1. 镜像地址： https://www.compshare.cn/images/F8XaOMDnxdRq  用该镜像创建实例即可运行成功
+2. 邀请连接： https://passport.compshare.cn/register?referral_code=ATnb90h6xxIEDxlOEvl46V
