@@ -196,6 +196,13 @@ npm run dev
 
 点击`启用麦克风`按钮，即可启用麦克风。可以与数字人进行连续语音交互。
 
+## 注意:
+
+本工程中没有数字人模型文件，可以在下面的连接中下载，解压后放到 `LiveTalking-v15/data/avatars` 路径下即可。或者也可以在`快速体验`部分中的镜像中提取
+
+通过网盘分享的文件：avatars
+链接: https://pan.baidu.com/s/1lAkKh-HFeDNZFlU3XIKKZw 提取码: 3hxq
+
 # 快速体验
 
 1. 镜像地址： https://www.compshare.cn/images/F8XaOMDnxdRq  用该镜像创建实例即可运行成功
