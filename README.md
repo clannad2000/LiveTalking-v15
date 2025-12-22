@@ -208,3 +208,14 @@ npm run dev
 1. 镜像地址： https://www.compshare.cn/images/F8XaOMDnxdRq  用该镜像创建实例即可运行成功
 2. 邀请连接： https://passport.compshare.cn/register?referral_code=ATnb90h6xxIEDxlOEvl46V
 3. 如果连接失败，尝试打开网址：  https://你的ip:8010/api/config/model  ，授权后刷新网页重连即可
+
+
+# 常见问题
+## 1. EdgeTTS: NoAudioReceived exception in attempt 1/3: No audio was received. Please verify that your parameters are correct.
+
+问题是 edge-tts api更新了，需要更新 edge-tts python 包
+
+```bash
+pip uninstall edge-tts
+pip install edge-tts
+```
