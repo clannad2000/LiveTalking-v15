@@ -1,0 +1,54 @@
+# 服务器配置
+server:
+  # 基本参数配置
+  fps: 50         # audio fps,must be 50
+  l: 10
+  r: 10
+
+  # avatar 相关配置 <先修改>
+  avatar_id: avator_3_480p       # define which avatar in data/avatars
+  bbox_shift: 0
+  batch_size: 25            # infer batch
+
+  # 自定义视频配置
+  customvideo_config: ""    # custom action json
+
+  # TTS 配置
+  tts: edgetts              # tts service type (xtts gpt-sovits cosyvoice edgetts)
+  REF_FILE: zh-CN-XiaoyiNeural
+  REF_TEXT: null
+  TTS_SERVER: http://127.0.0.1:9880  # http://localhost:9000
+
+  # 模型 配置
+  model: musetalkv15           # musetalk wav2lip ultralight
+
+  # 传输配置
+  transport: webrtc        # webrtc rtcpush virtualcam
+  # when use rtcpush, you can use push_url to set the url
+  # push_url: "http://localhost:1985/rtc/v1/whip/?app=live&stream=livestream"  # rtmp://localhost/live/livestream
+
+  # 会话和服务器配置
+  max_session: 3            # multi session count
+  listenport: 8010          # web listen port
+  ssl_cert: "./ssl/certificate.crt"              # Path to SSL certificate file
+  ssl_key: "./ssl/private.key"                   # Path to SSL private key file
+
+  llm_type: "openai"  # 使用 OpenAI 兼容 API (可选: openai, coze)
+
+# LLM配置
+llm:
+  # OpenAI兼容API配置 <请修改为你的配置>
+  openai:
+    api_key: "sk-your-api-key-here"  # 请替换为你的 OpenAI API密钥
+    base_url: "https://api.deepseek.com/v1"  # API base URL (DeepSeek, OpenAI, 或其他兼容服务)
+    model: "deepseek-chat"  # 使用的模型名称
+    system_prompt: "You are a helpful assistant. Please respond in plain text without using emojis, special symbols, or markdown formatting. Keep your responses natural and conversational."  # 系统提示词
+    stream: true  # 是否使用流式输出
+    stream_options: 
+      include_usage: true  # 是否在流式输出的最后一行展示token使用信息
+  
+  # Coze配置  <如果使用 Coze，请修改此配置>
+  coze:
+    api_token: "pat_your_coze_token_here"  # 请替换为你的 Coze API令牌
+    workflow_id: "your_workflow_id_here"  # 请替换为你的 Coze工作流ID
+    base_url: "https://api.coze.cn"  # Coze API基础URL
