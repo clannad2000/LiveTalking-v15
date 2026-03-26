@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  livetalking:
+    # 使用本地构建的镜像
+    build:
+      context: .
+      dockerfile: Dockerfile
+      #args:
+        # 如果需要代理，取消注释并设置
+        # http_proxy: http://your-proxy:port
+        # https_proxy: http://your-proxy:port
+    
+    # 或使用预构建的镜像
+    # image: registry.cn-hangzhou.aliyuncs.com/clannad/livetalkingv15:latest
+    
+    container_name: livetalking-v15
+    
+    # 使用启动脚本（包含环境检查和诊断信息）
+    # 如果不需要诊断信息，可以注释掉下面两行，使用 Dockerfile 中的默认 CMD
+    entrypoint: ["/bin/bash"]
+    command: ["/app/fix_and_start.sh"]
+    
+    # GPU 支持 (需要 nvidia-docker)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+    # 端口映射
+    ports:
+      - "8010:8010"    # HTTPS 服务端口
+    
+    # 环境变量
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    
+    # 数据卷挂载
+    volumes:
+      # 将整个项目目录映射到容器的 /app 目录，提供最大灵活性
+      # 包含代码、配置、模型、数据等所有文件
+      - .:/app
+    
+    # 重启策略
+    #restart: unless-stopped
+    
+    # 网络模式
+    network_mode: bridge
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8010/api/config/model"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# 网络配置 (可选)
+# networks:
+#   livetalking-net:
+#     driver: bridge

@@ -1,0 +1,47 @@
+# Git 相关
+.git
+.gitignore
+.github
+
+# Python 相关
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+
+# 虚拟环境
+.conda
+venv
+env
+ENV
+
+# IDE 相关
+.vscode
+.idea
+*.swp
+*.swo
+
+# 文档和资源
+docs
+assets/*.mp4
+README.md
+README-EN.md
+LICENSE
+
+# 模型文件 (构建时下载)
+models/*
+!models/put models here.txt
+!models/vosk-model-cn-0.22.zip
+
+# 数据文件
+data/avatars/*
+!data/avatars/.gitkeep
+
+# 日志和临时文件
+*.log
+*.tmp
+.DS_Store
