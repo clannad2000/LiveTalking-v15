@@ -55,17 +55,21 @@ def opai_response(message, nerfreal:BaseReal):
         stream_options=llm_config.get('stream_options', {"include_usage": True})
     )
     result=""
+    full_response=""  # 添加完整响应累积
     first = True
     for chunk in completion:
         if len(chunk.choices)>0:
-            #print(chunk.choices[0].delta.content)
             if first:
                 end = time.perf_counter()
                 logger.info(f"llm Time to first chunk: {end-start}s")
                 first = False
             msg = chunk.choices[0].delta.content
+            # 修复：检查 msg 是否为 None
+            if msg is None:
+                continue
+            
+            full_response += msg  # 累积完整响应
             lastpos=0
-            #msglist = re.split('[,.!;:，。！?]',msg)
             for i, char in enumerate(msg):
                 if char in ",.!;:，。！？：；" :
                     result = result+msg[lastpos:i+1]
@@ -77,8 +81,10 @@ def opai_response(message, nerfreal:BaseReal):
             result = result+msg[lastpos:]
     end = time.perf_counter()
     logger.info(f"llm Time to last chunk: {end-start}s")
-    nerfreal.put_msg_txt(result)  
-    return result
+    if result:  # 发送剩余内容
+        nerfreal.put_msg_txt(result)
+    logger.info(f"llm Full response: {full_response}")  # 记录完整响应
+    return full_response  # 返回完整响应而不是最后一段
     
 def coze_response(text, nerfreal:BaseReal):
     start = time.perf_counter()
@@ -93,5 +99,5 @@ def coze_response(text, nerfreal:BaseReal):
         sentence = sentence.strip()
         if sentence:
             nerfreal.put_msg_txt(sentence)
-
-    return response
+    
+    return response  # 添加返回值
